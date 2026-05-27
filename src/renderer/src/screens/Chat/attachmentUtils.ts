@@ -173,7 +173,8 @@ export async function compressImageToFit(
   }
 
   // Render once at full resolution to probe for alpha — decides whether
-  // we can switch to JPEG (huge size win) or must stay on PNG.
+  // we can switch to lossy compression (huge size win) or must stay on
+  // a lossless format that preserves transparency.
   const probeCanvas = document.createElement("canvas");
   probeCanvas.width = img.naturalWidth;
   probeCanvas.height = img.naturalHeight;
@@ -181,12 +182,40 @@ export async function compressImageToFit(
   if (!probeCtx) throw new Error("canvas-unavailable");
   probeCtx.drawImage(img, 0, 0);
   const hasAlpha = canvasHasTransparency(probeCanvas);
-  const outputType = hasAlpha ? "image/png" : "image/jpeg";
+
+  // Output-format choice:
+  //   - Alpha images: stay PNG (the lossless format with transparency).
+  //     We could try WebP-lossless, but PNG is universally accepted by
+  //     vision endpoints and WebP-lossless rarely beats it.
+  //   - Opaque images: prefer WebP (~25-30% smaller than JPEG at the
+  //     same perceptual quality), with JPEG as a runtime fallback.
+  //     WebP is accepted by all major vision providers (OpenAI,
+  //     Anthropic via OpenAI-compat, Google, OpenRouter), but Chromium
+  //     versions in extremely old Electron builds occasionally fail
+  //     to encode it — that's why we probe before committing.
+  //
+  // The base64 inflation that goes on the wire (4/3×) is fixed by the
+  // OpenAI chat-completions content shape, but the binary that gets
+  // inflated is whatever we choose here, so smaller binary = smaller
+  // request body = more headroom under the gateway's 10 MB cap.
+  let outputType: string;
+  let outputExt: string;
+  if (hasAlpha) {
+    outputType = "image/png";
+    outputExt = "png";
+  } else if (await canvasSupportsType(probeCanvas, "image/webp")) {
+    outputType = "image/webp";
+    outputExt = "webp";
+  } else {
+    outputType = "image/jpeg";
+    outputExt = "jpg";
+  }
+  const isLossy = outputType === "image/webp" || outputType === "image/jpeg";
 
   // Compression loop:
-  //   Phase 1 — JPEG only: step quality down from 0.85 to 0.5.
-  //   Phase 2 — PNG path or JPEG still too big: scale dimensions down
-  //     by 20% per step, resetting quality to 0.85 for JPEG each round.
+  //   Phase 1 — lossy format: step quality down from 0.85 to 0.5.
+  //   Phase 2 — PNG path or lossy still too big: scale dimensions down
+  //     by 20% per step, resetting quality to 0.85 each round.
   let scale = 1.0;
   let quality = 0.85;
   // Reuse the probe canvas at scale=1 to skip a re-decode for the first
@@ -201,16 +230,15 @@ export async function compressImageToFit(
     const blob = await canvasToBlob(
       workingCanvas,
       outputType,
-      hasAlpha ? undefined : quality,
+      isLossy ? quality : undefined,
     );
     if (blob.size <= targetBytes) {
-      const ext = hasAlpha ? "png" : "jpg";
-      const newName = file.name.replace(/\.[^.]+$/, "") + "." + ext;
+      const newName = file.name.replace(/\.[^.]+$/, "") + "." + outputExt;
       return new File([blob], newName, { type: outputType });
     }
 
-    // For JPEG: drop quality before scaling — visually preferable.
-    if (!hasAlpha && quality > 0.5) {
+    // For lossy formats: drop quality before scaling — visually preferable.
+    if (isLossy && quality > 0.5) {
       quality -= 0.15;
       continue;
     }
@@ -230,10 +258,38 @@ export async function compressImageToFit(
     if (!sctx) throw new Error("canvas-unavailable");
     sctx.drawImage(img, 0, 0, scaled.width, scaled.height);
     workingCanvas = scaled;
-    quality = 0.85; // reset for next JPEG attempt
+    quality = 0.85; // reset for next quality attempt
   }
 
   throw new Error("image-uncompressible");
+}
+
+/**
+ * Runtime feature probe: does this canvas's `toBlob` actually produce
+ * the requested MIME type? Chromium's toBlob silently falls back to
+ * PNG when it can't honour the requested type (no error, just a
+ * misleading output blob), so the only reliable check is to ask for a
+ * tiny encode and inspect the result.  Cheap (<5 ms for a 1×1 canvas)
+ * and we only call it once per compression session.
+ */
+async function canvasSupportsType(
+  source: HTMLCanvasElement,
+  type: string,
+): Promise<boolean> {
+  // Use a 1×1 probe canvas rather than `source` so the probe is fast
+  // regardless of the source's pixel area (a 4000×4000 source would
+  // otherwise burn dozens of MB encoding the probe).
+  const probe = document.createElement("canvas");
+  probe.width = 1;
+  probe.height = 1;
+  const ctx = probe.getContext("2d");
+  if (ctx) ctx.drawImage(source, 0, 0, 1, 1);
+  try {
+    const blob = await canvasToBlob(probe, type, 0.5);
+    return blob.type === type;
+  } catch {
+    return false;
+  }
 }
 
 export interface ProcessFilesResult {

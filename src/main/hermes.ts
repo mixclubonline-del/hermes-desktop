@@ -199,6 +199,19 @@ function isApiServerReady(): Promise<boolean> {
   });
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForApiServerReady(timeoutMs = 8000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await isApiServerReady()) return true;
+    await delay(250);
+  }
+  return false;
+}
+
 // ────────────────────────────────────────────────────
 //  Ensure API server is enabled in config
 // ────────────────────────────────────────────────────
@@ -874,12 +887,16 @@ function sendMessageViaCli(
   let capturedSessionId = "";
   let outputBuffer = "";
 
+  function captureSessionId(text: string): void {
+    const sidMatch = text.match(/session_id:\s*(\S+)/);
+    if (sidMatch) capturedSessionId = sidMatch[1];
+  }
+
   function processOutput(raw: Buffer): void {
     const text = stripAnsi(raw.toString());
     outputBuffer += text;
 
-    const sidMatch = outputBuffer.match(/session_id:\s*(\S+)/);
-    if (sidMatch) capturedSessionId = sidMatch[1];
+    captureSessionId(outputBuffer);
 
     const cleaned = text.replace(/session_id:\s*\S+\n?/g, "");
     const lines = cleaned.split("\n");
@@ -902,6 +919,7 @@ function sendMessageViaCli(
   let stderrBuffer = "";
   proc.stderr?.on("data", (data: Buffer) => {
     const text = stripAnsi(data.toString());
+    captureSessionId(text);
     if (
       !text.trim() ||
       text.includes("UserWarning") ||
@@ -980,9 +998,19 @@ export async function sendMessage(
     );
   }
 
-  // Check API server availability (cache the result, re-check periodically)
-  if (apiServerAvailable === null || apiServerAvailable === false) {
+  // Check API server availability. In local mode, a running gateway process
+  // can still be in its startup window (or the cached ready state can be stale
+  // after an external stop/start), so verify health before taking the API path.
+  const localGatewayRunning = !isRemoteMode() && isGatewayRunning();
+  if (
+    apiServerAvailable === null ||
+    apiServerAvailable === false ||
+    localGatewayRunning
+  ) {
     apiServerAvailable = await isApiServerReady();
+    if (!apiServerAvailable && localGatewayRunning) {
+      apiServerAvailable = await waitForApiServerReady();
+    }
   }
 
   if (apiServerAvailable) {

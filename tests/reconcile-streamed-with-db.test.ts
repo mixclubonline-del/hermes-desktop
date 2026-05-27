@@ -264,4 +264,35 @@ describe("reconcileStreamedWithDb", () => {
     // DB row takes precedence; the duplicate streamed row is dropped.
     expect(merged[0].id).toBe("a-1");
   });
+
+  it("keeps earlier streamed turns before a DB suffix from a split session", () => {
+    // Regression: a cold desktop send briefly fell back to the CLI path,
+    // which created a timestamp-style session id. The next send used the
+    // API path and generated a fresh desk-* id. At chat-done, the DB fetch
+    // returned only the desk-* suffix, and the old reconciliation appended
+    // the unmatched first turn after the latest answer.
+    const streamed: ChatMessage[] = [
+      STREAMED_USER("hi", "u-old"),
+      STREAMED_AGENT("Hi! What can I help you with today?", "a-old"),
+      STREAMED_USER("what time is it?", "u-new"),
+      STREAMED_AGENT("It's Wed, May 27, 2026, 2:34 PM.", "a-new"),
+    ];
+    const db: ChatMessage[] = [
+      DB_USER("what time is it?", 30),
+      DB_TOOL_CALL("call-time", "terminal", '{"command":"date"}', 31),
+      DB_TOOL_RESULT("call-time", "terminal", "Wed, May 27, 2026 2:34 PM", 32),
+      DB_AGENT("It's Wed, May 27, 2026, 2:34 PM.", 33),
+    ];
+
+    const merged = reconcileStreamedWithDb(streamed, db);
+
+    expect(merged.map((m) => m.id)).toEqual([
+      "u-old",
+      "a-old",
+      "u-new",
+      "db-tc-31-call-time",
+      "db-tr-32",
+      "a-new",
+    ]);
+  });
 });

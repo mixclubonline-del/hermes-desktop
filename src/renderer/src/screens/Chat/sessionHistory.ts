@@ -233,19 +233,32 @@ export function reconcileStreamedWithDb(
   // result, skip it — it's a near-duplicate that slipped past the
   // key-based match (e.g. trailing-whitespace drift, one-frame delta
   // that didn't round-trip through the DB identically).
-  const seenBubbleKeys = new Set<string>();
-  for (const m of result) {
-    if (!("kind" in m)) {
-      const bubble = m as ChatBubbleMessage;
-      seenBubbleKeys.add(
-        `${bubble.role}:${normalizeWhitespace(bubble.content || "")}`,
-      );
-    }
-  }
-
   const consumedIds = new Set(result.map((m) => m.id));
-  for (const m of streamed) {
-    if (consumedIds.has(m.id)) continue;
+  const consumedStreamIndexes: number[] = [];
+  for (let i = 0; i < streamed.length; i++) {
+    if (consumedIds.has(streamed[i].id)) consumedStreamIndexes.push(i);
+  }
+  const firstConsumedIndex =
+    consumedStreamIndexes.length > 0 ? Math.min(...consumedStreamIndexes) : -1;
+
+  const seedSeenBubbleKeys = (
+    seen: Set<string>,
+    items: ReadonlyArray<ChatMessage>,
+  ): void => {
+    for (const m of items) {
+      if (!("kind" in m)) {
+        const bubble = m as ChatBubbleMessage;
+        seen.add(`${bubble.role}:${normalizeWhitespace(bubble.content || "")}`);
+      }
+    }
+  };
+
+  const appendIfUnique = (
+    target: ChatMessage[],
+    m: ChatMessage,
+    seen: Set<string>,
+  ): boolean => {
+    if (consumedIds.has(m.id)) return false;
     // For bubble messages, check if an equivalent already exists in the
     // result set.  Non-bubble messages (tool_call, tool_result, reasoning)
     // always pass through — they're either matched by callId above or are
@@ -253,11 +266,31 @@ export function reconcileStreamedWithDb(
     if (!("kind" in m)) {
       const bubble = m as ChatBubbleMessage;
       const contentKey = `${bubble.role}:${normalizeWhitespace(bubble.content || "")}`;
-      if (seenBubbleKeys.has(contentKey)) continue;
-      seenBubbleKeys.add(contentKey);
+      if (seen.has(contentKey)) return false;
+      seen.add(contentKey);
     }
-    result.push(m);
+    target.push(m);
+    return true;
+  };
+
+  const prefix: ChatMessage[] = [];
+  const seenPrefixBubbleKeys = new Set<string>();
+  for (let i = 0; i < streamed.length; i++) {
+    const m = streamed[i];
+    if (firstConsumedIndex >= 0 && i < firstConsumedIndex) {
+      appendIfUnique(prefix, m, seenPrefixBubbleKeys);
+    }
   }
 
-  return result;
+  const suffix: ChatMessage[] = [];
+  const seenSuffixBubbleKeys = new Set<string>();
+  seedSeenBubbleKeys(seenSuffixBubbleKeys, prefix);
+  seedSeenBubbleKeys(seenSuffixBubbleKeys, result);
+  for (let i = 0; i < streamed.length; i++) {
+    const m = streamed[i];
+    if (firstConsumedIndex >= 0 && i < firstConsumedIndex) continue;
+    appendIfUnique(suffix, m, seenSuffixBubbleKeys);
+  }
+
+  return [...prefix, ...result, ...suffix];
 }

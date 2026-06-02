@@ -3128,11 +3128,72 @@ body {
 }
 
 /* Model picker */
+/* Footer row below the input: model picker + context-folder chip. */
+.chat-input-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
 .chat-model-bar {
   position: relative;
   display: flex;
   align-items: center;
-  margin-top: 6px;
+}
+
+/* Shared chip style for the input-footer controls (model + folder). */
+.chat-meta-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all var(--transition);
+}
+
+.chat-meta-chip:hover,
+.chat-meta-chip--active {
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+}
+
+.chat-ctxfolder-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.chat-ctxfolder-name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-meta-chip-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 4px;
+  transition: all var(--transition);
+}
+
+.chat-meta-chip-icon:hover,
+.chat-meta-chip-icon--active {
+  color: var(--text-secondary);
+  background: var(--bg-hover);
 }
 
 .chat-model-trigger {

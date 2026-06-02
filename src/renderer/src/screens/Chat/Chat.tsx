@@ -4,6 +4,7 @@ import { ChatHeader } from "./ChatHeader";
 import { ChatEmptyState } from "./ChatEmptyState";
 import { MessageList } from "./MessageList";
 import { ModelPicker } from "./ModelPicker";
+import { ContextFolderChip } from "./ContextFolderChip";
 import { WorktreePanel } from "./WorktreePanel";
 import { useChatScroll } from "./hooks/useChatScroll";
 import { useChatIPC } from "./hooks/useChatIPC";
@@ -356,13 +357,7 @@ function Chat({
         usage={usage}
         fastMode={fastMode}
         hasMessages={messages.length > 0}
-        contextFolder={contextFolder}
-        showContextFolder={!remoteMode}
-        worktreeVisible={worktreeVisible}
-        onPickFolder={handlePickFolder}
-        onClearFolder={handleClearFolder}
         onToggleFast={toggleFastMode}
-        onToggleWorktree={() => setWorktreeVisible((v) => !v)}
         onNewChat={onNewChat}
         onClear={handleClear}
       />
@@ -409,15 +404,25 @@ function Chat({
           onQuickAsk={actions.handleQuickAsk}
           onAbort={actions.handleAbort}
         />
-        <ModelPicker
-          currentModel={modelConfig.currentModel}
-          currentProvider={modelConfig.currentProvider}
-          currentBaseUrl={modelConfig.currentBaseUrl}
-          modelGroups={modelConfig.modelGroups}
-          displayModel={modelConfig.displayModel}
-          onOpen={modelConfig.reload}
-          onSelectModel={modelConfig.selectModel}
-        />
+        <div className="chat-input-meta">
+          <ModelPicker
+            currentModel={modelConfig.currentModel}
+            currentProvider={modelConfig.currentProvider}
+            currentBaseUrl={modelConfig.currentBaseUrl}
+            modelGroups={modelConfig.modelGroups}
+            displayModel={modelConfig.displayModel}
+            onOpen={modelConfig.reload}
+            onSelectModel={modelConfig.selectModel}
+          />
+          <ContextFolderChip
+            contextFolder={contextFolder}
+            show={!remoteMode}
+            worktreeVisible={worktreeVisible}
+            onPickFolder={handlePickFolder}
+            onClearFolder={handleClearFolder}
+            onToggleWorktree={() => setWorktreeVisible((v) => !v)}
+          />
+        </div>
       </div>
       {dragActive && (
         <div className="chat-drop-overlay" aria-hidden>

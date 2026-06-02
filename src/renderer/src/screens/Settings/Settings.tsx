@@ -131,6 +131,8 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
   // Network settings
   const [forceIpv4, setForceIpv4] = useState(false);
   const [httpProxy, setHttpProxy] = useState("");
+  const httpProxyRef = useRef("");
+  const savedHttpProxyRef = useRef("");
   const [networkSaved, setNetworkSaved] = useState(false);
 
   // Debug dump
@@ -171,7 +173,10 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
       setForceIpv4(v === "true" || v === "True");
     });
     window.hermesAPI.getConfig("network.proxy", profile).then((v) => {
-      setHttpProxy(v || "");
+      const loadedProxy = v || "";
+      setHttpProxy(loadedProxy);
+      httpProxyRef.current = loadedProxy;
+      savedHttpProxyRef.current = loadedProxy.trim();
     });
 
     // Defer slow calls — background refresh, cached values show instantly
@@ -202,6 +207,32 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
   useEffect(() => {
     void Promise.resolve().then(loadConfig);
   }, [loadConfig]);
+
+  const saveHttpProxy = useCallback(async (): Promise<void> => {
+    const trimmed = httpProxyRef.current.trim();
+    if (trimmed === savedHttpProxyRef.current) return;
+    await window.hermesAPI.setConfig("network.proxy", trimmed, profile);
+    savedHttpProxyRef.current = trimmed;
+    setNetworkSaved(true);
+    setTimeout(() => setNetworkSaved(false), 2000);
+  }, [profile]);
+
+  useEffect(() => {
+    httpProxyRef.current = httpProxy;
+  }, [httpProxy]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void saveHttpProxy();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [httpProxy, saveHttpProxy]);
+
+  useEffect(() => {
+    return () => {
+      void saveHttpProxy();
+    };
+  }, [saveHttpProxy]);
 
   async function handleMigrate(): Promise<void> {
     setMigrating(true);
@@ -994,15 +1025,19 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
             className="input"
             type="text"
             value={httpProxy}
-            onChange={(e) => setHttpProxy(e.target.value)}
-            onBlur={async () => {
-              await window.hermesAPI.setConfig(
-                "network.proxy",
-                httpProxy.trim(),
-                profile,
-              );
-              setNetworkSaved(true);
-              setTimeout(() => setNetworkSaved(false), 2000);
+            onChange={(e) => {
+              httpProxyRef.current = e.target.value;
+              setHttpProxy(e.target.value);
+            }}
+            onBlur={() => {
+              void saveHttpProxy();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void saveHttpProxy();
+                e.currentTarget.blur();
+              }
             }}
             placeholder={t("settings.proxyPlaceholder")}
           />

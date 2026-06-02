@@ -239,6 +239,56 @@ function stripYamlQuotes(raw: string): string {
   return trimmed;
 }
 
+function quoteYamlScalar(value: string): string {
+  return JSON.stringify(value);
+}
+
+function appendDirectNestedYamlValue(
+  content: string,
+  segments: string[],
+  value: string,
+): string | null {
+  if (segments.length !== 2) return null;
+  const [parent, child] = segments;
+  if (!parent || !child) return null;
+
+  const newline = content.includes("\r\n") ? "\r\n" : "\n";
+  const quotedValue = quoteYamlScalar(value);
+  const parentRe = new RegExp(
+    `^${escapeRegex(parent)}:[ \\t]*(#.*)?(?:\\r?\\n|$)`,
+    "m",
+  );
+  const parentMatch = parentRe.exec(content);
+
+  if (!parentMatch || parentMatch.index === undefined) {
+    const sep = content === "" || content.endsWith("\n") ? "" : newline;
+    return `${content}${sep}${parent}:${newline}  ${child}: ${quotedValue}${newline}`;
+  }
+
+  const blockStart = parentMatch.index + parentMatch[0].length;
+  let blockEnd = blockStart;
+  let cursor = blockStart;
+
+  while (cursor < content.length) {
+    const lineEnd = content.indexOf("\n", cursor);
+    const lineEndExclusive = lineEnd === -1 ? content.length : lineEnd;
+    const line = content.slice(cursor, lineEndExclusive);
+
+    if (line.trim() !== "" && !/^[ \t]/.test(line)) {
+      break;
+    }
+
+    blockEnd =
+      lineEndExclusive === content.length
+        ? content.length
+        : lineEndExclusive + 1;
+    cursor = blockEnd;
+  }
+
+  const insertion = `  ${child}: ${quotedValue}${newline}`;
+  return `${content.slice(0, blockEnd)}${insertion}${content.slice(blockEnd)}`;
+}
+
 /**
  * Locate a dotted YAML path in `content` (e.g. "agent.service_tier" finds
  * the `service_tier` field nested under top-level `agent:`). Returns the
@@ -461,20 +511,26 @@ export function setConfigValue(
   if (hit) {
     content =
       content.slice(0, hit.valueStart) +
-      `"${value}"` +
+      quoteYamlScalar(value) +
       content.slice(hit.valueEnd);
     safeWriteFile(configFile, content);
     return;
   }
 
-  // Key missing. For multi-segment paths we don't know how deep the
-  // user's existing parent block goes (or which segments exist), so
-  // avoid guessing — drop the write rather than corrupting the file.
-  // Top-level single keys are safe to append.
+  // Key missing. Top-level single keys are safe to append. Direct
+  // two-segment scalar paths are also safe to create/append and are used
+  // by Settings fields such as `network.proxy`. Deeper paths remain a
+  // no-op to avoid guessing inside complex user-edited YAML.
   if (segments.length === 1) {
     const sep = content.endsWith("\n") || content === "" ? "" : "\n";
-    content = `${content}${sep}${key}: "${value}"\n`;
+    content = `${content}${sep}${key}: ${quoteYamlScalar(value)}\n`;
     safeWriteFile(configFile, content);
+    return;
+  }
+
+  const nextContent = appendDirectNestedYamlValue(content, segments, value);
+  if (nextContent !== null) {
+    safeWriteFile(configFile, nextContent);
   }
 }
 

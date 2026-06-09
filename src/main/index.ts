@@ -274,6 +274,13 @@ import {
   sshRunDump,
   sshDiscoverMemoryProviders,
 } from "./ssh-remote";
+import { applyGpuPreferences, installGpuCrashGuard } from "./gpu-fallback";
+
+// Disable hardware acceleration up front if a prior launch detected a fatal
+// GPU crash (or the user forced it). MUST run before app is ready. See
+// gpu-fallback.ts / issue #592.
+applyGpuPreferences();
+installGpuCrashGuard();
 
 process.on("uncaughtException", (err) => {
   console.error("[MAIN UNCAUGHT]", err);
@@ -941,7 +948,10 @@ function setupIPC(): void {
             try {
               persistPromptImageAttachments(sessionId, message, attachments);
             } catch (err) {
-              console.warn("[sessions] Failed to persist prompt image attachments:", err);
+              console.warn(
+                "[sessions] Failed to persist prompt image attachments:",
+                err,
+              );
             }
             safeSend("chat-done", sessionId || "");
             resolveChat({ response: fullResponse, sessionId });
@@ -1164,34 +1174,39 @@ function setupIPC(): void {
     },
   );
 
-  ipcMain.handle("get-messaging-platforms", async (_event, profile?: string) => {
-    const conn = getConnectionConfig();
-    if (conn.mode === "remote") {
-      return fetchRemoteMessagingPlatforms();
-    }
-    if (conn.mode === "ssh" && conn.ssh) {
-      const [envData, enabled, running, platformToolsets] = await Promise.all([
-        sshReadEnv(conn.ssh, profile),
-        sshGetPlatformEnabled(conn.ssh, profile),
-        sshGatewayStatus(conn.ssh),
-        sshGetPlatformToolsets(conn.ssh, profile),
-      ]);
+  ipcMain.handle(
+    "get-messaging-platforms",
+    async (_event, profile?: string) => {
+      const conn = getConnectionConfig();
+      if (conn.mode === "remote") {
+        return fetchRemoteMessagingPlatforms();
+      }
+      if (conn.mode === "ssh" && conn.ssh) {
+        const [envData, enabled, running, platformToolsets] = await Promise.all(
+          [
+            sshReadEnv(conn.ssh, profile),
+            sshGetPlatformEnabled(conn.ssh, profile),
+            sshGatewayStatus(conn.ssh),
+            sshGetPlatformToolsets(conn.ssh, profile),
+          ],
+        );
+        return buildDesktopMessagingPlatforms(
+          envData,
+          enabled,
+          running,
+          platformToolsets,
+        );
+      }
+      const running = isGatewayRunning(profile);
       return buildDesktopMessagingPlatforms(
-        envData,
-        enabled,
+        readEnv(profile),
+        getPlatformEnabled(profile),
         running,
-        platformToolsets,
+        getPlatformToolsets(profile),
+        readLocalGatewayPlatformStates(profile, running),
       );
-    }
-    const running = isGatewayRunning(profile);
-    return buildDesktopMessagingPlatforms(
-      readEnv(profile),
-      getPlatformEnabled(profile),
-      running,
-      getPlatformToolsets(profile),
-      readLocalGatewayPlatformStates(profile, running),
-    );
-  });
+    },
+  );
 
   ipcMain.handle(
     "update-messaging-platform",
@@ -1246,12 +1261,14 @@ function setupIPC(): void {
         return testRemoteMessagingPlatform(platform);
       }
       if (conn.mode === "ssh" && conn.ssh) {
-        const [envData, enabled, running, platformToolsets] = await Promise.all([
-          sshReadEnv(conn.ssh, profile),
-          sshGetPlatformEnabled(conn.ssh, profile),
-          sshGatewayStatus(conn.ssh),
-          sshGetPlatformToolsets(conn.ssh, profile),
-        ]);
+        const [envData, enabled, running, platformToolsets] = await Promise.all(
+          [
+            sshReadEnv(conn.ssh, profile),
+            sshGetPlatformEnabled(conn.ssh, profile),
+            sshGatewayStatus(conn.ssh),
+            sshGetPlatformToolsets(conn.ssh, profile),
+          ],
+        );
         return testDesktopMessagingPlatform(
           platform,
           buildDesktopMessagingPlatforms(
@@ -1882,8 +1899,9 @@ function setupIPC(): void {
     (_event, input: McpServerInput, profile?: string) =>
       addMcpServer(input, profile),
   );
-  ipcMain.handle("remove-mcp-server", (_event, name: string, profile?: string) =>
-    removeMcpServer(name, profile),
+  ipcMain.handle(
+    "remove-mcp-server",
+    (_event, name: string, profile?: string) => removeMcpServer(name, profile),
   );
   ipcMain.handle(
     "set-mcp-server-enabled",

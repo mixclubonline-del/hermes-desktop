@@ -302,7 +302,7 @@ for cat in os.listdir(skills_dir):
                     else:
                         break
                 if in_fm and line.strip().startswith("name:"):
-                    skill_name = line.split(":", 1)[1].strip().strip("\"'")
+                    skill_name = line.split(":", 1)[1].strip().strip('"').strip("'")
                     break
         except Exception:
             pass

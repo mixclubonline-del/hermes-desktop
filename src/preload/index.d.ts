@@ -352,6 +352,12 @@ interface HermesAPI {
     /** Subset of `models` flagged as free (Nous Portal today). #367. */
     freeModels?: string[];
   }>;
+  getModelContextWindow: (
+    provider: string,
+    model: string,
+    baseUrl?: string,
+    profile?: string,
+  ) => Promise<number | null>;
   onChatChunk: (callback: (chunk: string) => void) => () => void;
   onChatReasoningChunk: (callback: (chunk: string) => void) => () => void;
   onChatDone: (callback: (sessionId?: string) => void) => () => void;
@@ -384,7 +390,9 @@ interface HermesAPI {
     enabled: boolean,
     profile?: string,
   ) => Promise<boolean>;
-  getMessagingPlatforms: (profile?: string) => Promise<MessagingPlatformsResponse>;
+  getMessagingPlatforms: (
+    profile?: string,
+  ) => Promise<MessagingPlatformsResponse>;
   updateMessagingPlatform: (
     platform: string,
     update: MessagingPlatformUpdate,
@@ -863,9 +871,7 @@ interface HermesAPI {
   >;
 
   // MCP servers
-  listMcpServers: (
-    profile?: string,
-  ) => Promise<
+  listMcpServers: (profile?: string) => Promise<
     Array<{
       name: string;
       type: "http" | "stdio" | "unknown";

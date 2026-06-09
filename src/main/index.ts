@@ -17,7 +17,10 @@ import icon from "../../resources/icon.png?asset";
 import type { Attachment } from "../shared/attachments";
 import { stageAttachment, clearStagedAttachments } from "./attachment-staging";
 import { persistPromptImageAttachments } from "./session-attachment-store";
-import { discoverProviderModels } from "./model-discovery";
+import {
+  discoverProviderModels,
+  getModelContextWindow,
+} from "./model-discovery";
 import {
   cleanupTempMediaFiles,
   materializeDataUrlToTemp,
@@ -1094,6 +1097,28 @@ function setupIPC(): void {
       profile?: string,
     ) => {
       return discoverProviderModels(provider, baseUrl, apiKey, profile);
+    },
+  );
+
+  // Authoritative context-window size for the active model (issue #597).
+  // Resolves the real `context_length` from the provider's /models catalogue;
+  // returns null when unavailable so the renderer falls back to its heuristic.
+  ipcMain.handle(
+    "get-model-context-window",
+    (
+      _event,
+      provider: string,
+      model: string,
+      baseUrl: string | undefined,
+      profile?: string,
+    ) => {
+      return getModelContextWindow(
+        provider,
+        model,
+        baseUrl,
+        undefined,
+        profile,
+      );
     },
   );
 

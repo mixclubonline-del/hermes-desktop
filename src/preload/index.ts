@@ -357,6 +357,20 @@ const hermesAPI = {
       profile,
     ),
 
+  getModelContextWindow: (
+    provider: string,
+    model: string,
+    baseUrl?: string,
+    profile?: string,
+  ): Promise<number | null> =>
+    ipcRenderer.invoke(
+      "get-model-context-window",
+      provider,
+      model,
+      baseUrl,
+      profile,
+    ),
+
   onChatChunk: (callback: (chunk: string) => void): (() => void) => {
     const handler = (_event: Electron.IpcRendererEvent, chunk: string): void =>
       callback(chunk);
@@ -413,9 +427,7 @@ const hermesAPI = {
     return () => ipcRenderer.removeListener("chat-tool-progress", handler);
   },
 
-  onChatToolEvent: (
-    callback: (event: ChatToolEvent) => void,
-  ): (() => void) => {
+  onChatToolEvent: (callback: (event: ChatToolEvent) => void): (() => void) => {
     const handler = (
       _event: Electron.IpcRendererEvent,
       toolEvent: ChatToolEvent,

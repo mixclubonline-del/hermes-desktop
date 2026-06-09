@@ -21,6 +21,7 @@ import type { Attachment } from "../../../../shared/attachments";
 import type { ChatMessage, UsageState } from "./types";
 import type { ContextUsage } from "./ContextGauge";
 import { contextWindowForModel } from "./contextWindows";
+import { QueuedMessages } from "./QueuedMessages";
 
 interface QueuedMessage {
   text: string;
@@ -65,7 +66,7 @@ function Chat({
   const dragCounter = useRef(0);
   const chatInputRef = useRef<ChatInputHandle>(null);
   const queueRef = useRef<QueuedMessage[]>([]);
-  const [queuedCount, setQueuedCount] = useState(0);
+  const [queuedMessages, setQueuedMessages] = useState<QueuedMessage[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,6 +121,41 @@ function Chat({
     modelConfig.currentBaseUrl,
   ]);
 
+  // Authoritative context-window size for the active model, resolved from the
+  // provider's /models catalogue (issue #597). Null until/unless the provider
+  // advertises it — the gauge then falls back to the static heuristic.
+  const [realContextWindow, setRealContextWindow] = useState<number | null>(
+    null,
+  );
+  useEffect(() => {
+    let cancelled = false;
+    setRealContextWindow(null);
+    if (!modelConfig.currentModel) return;
+    window.hermesAPI
+      .getModelContextWindow(
+        modelConfig.currentProvider,
+        modelConfig.currentModel,
+        modelConfig.currentBaseUrl,
+        profile,
+      )
+      .then((w) => {
+        if (!cancelled && typeof w === "number" && w > 0) {
+          setRealContextWindow(w);
+        }
+      })
+      .catch(() => {
+        /* fall back to heuristic */
+      });
+    return (): void => {
+      cancelled = true;
+    };
+  }, [
+    profile,
+    modelConfig.currentModel,
+    modelConfig.currentProvider,
+    modelConfig.currentBaseUrl,
+  ]);
+
   useChatIPC({
     setMessages,
     setHermesSessionId,
@@ -136,7 +172,7 @@ function Chat({
       setHermesSessionId(null);
       setContextFolder(null);
       queueRef.current = [];
-      setQueuedCount(0);
+      setQueuedMessages([]);
     }
   }, [messages]);
 
@@ -148,7 +184,7 @@ function Chat({
     setHermesSessionId(sessionId);
     setContextFolder(null);
     queueRef.current = [];
-    setQueuedCount(0);
+    setQueuedMessages([]);
   }, [sessionId]);
 
   // Cmd/Ctrl+N → new chat
@@ -233,7 +269,7 @@ function Chat({
     setUsage(null);
     setToolProgress(null);
     queueRef.current = [];
-    setQueuedCount(0);
+    setQueuedMessages([]);
   }, [isLoading, hermesSessionId, sessionId, setMessages]);
 
   const localCommands = useLocalCommands({
@@ -270,12 +306,12 @@ function Chat({
     if (isLoading) return;
     const next = queueRef.current.shift();
     if (!next) return;
-    setQueuedCount(queueRef.current.length);
+    setQueuedMessages([...queueRef.current]);
     handleSendRef.current(next.text, next.attachments, true).catch(() => {
       // Put the message back at the front so it isn't silently lost if
       // the send fails (e.g. IPC error before onChatError fires).
       queueRef.current.unshift(next);
-      setQueuedCount(queueRef.current.length);
+      setQueuedMessages([...queueRef.current]);
     });
   }, [isLoading]);
 
@@ -283,7 +319,7 @@ function Chat({
     (text: string, attachments: Attachment[]) => {
       if (isLoading) {
         queueRef.current.push({ text, attachments });
-        setQueuedCount(queueRef.current.length);
+        setQueuedMessages([...queueRef.current]);
         return;
       }
       void handleSendRef.current(text, attachments);
@@ -357,7 +393,8 @@ function Chat({
   const contextUsage: ContextUsage | null = usage?.contextTokens
     ? {
         used: usage.contextTokens,
-        window: contextWindowForModel(modelConfig.currentModel),
+        window:
+          realContextWindow ?? contextWindowForModel(modelConfig.currentModel),
         cacheReadTokens: usage.cacheReadTokens,
         cacheWriteTokens: usage.cacheWriteTokens,
       }
@@ -404,12 +441,8 @@ function Chat({
         )}
       </div>
 
-      {queuedCount > 0 && (
-        <div className="chat-queue-indicator">
-          {t("chat.queued", { count: queuedCount })}
-        </div>
-      )}
       <div className="chat-input-area">
+        <QueuedMessages messages={queuedMessages} />
         <ChatInput
           ref={chatInputRef}
           isLoading={isLoading}

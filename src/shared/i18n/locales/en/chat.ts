@@ -120,6 +120,8 @@ export default {
     version: "Show Hermes version",
   },
   queued: "{{count}} message(s) queued — will send when the agent finishes",
+  queuedCount: "{{count}} queued",
+  queuedAttachment: "{{count}} attachment(s)",
   worktree: {
     loading: "Loading",
     empty: "Folder is empty",

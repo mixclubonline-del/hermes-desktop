@@ -22,8 +22,14 @@ const CONTEXT_WINDOWS: Array<[RegExp, number]> = [
   // Google
   [/gemini-1\.5|gemini-2|gemini-3/i, 1048576],
   // Other OpenAI-compatible providers
-  [/deepseek/i, 1048576],
+  // DeepSeek's API models (deepseek-chat / deepseek-reasoner, V3.x) advertise
+  // a 128K context — not 64K (the old "65.5k" the gauge wrongly showed) nor 1M.
+  // Issue #597. Providers that expose `context_length` over /models override
+  // this via authoritative detection; this is only the fallback.
+  [/deepseek/i, 131072],
   [/agnes/i, 262144],
+  // Moonshot's Kimi K2 family — 256K context.
+  [/kimi|moonshot/i, 262144],
   [/qwen/i, 32768],
   [/mistral/i, 32768],
 ];

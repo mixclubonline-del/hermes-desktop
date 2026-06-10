@@ -331,6 +331,11 @@ function Chat({
     });
   }, [isLoading]);
 
+  const handleRemoveQueued = useCallback((index: number) => {
+    queueRef.current.splice(index, 1);
+    setQueuedMessages([...queueRef.current]);
+  }, []);
+
   const handleSubmitOrQueue = useCallback(
     (text: string, attachments: Attachment[]) => {
       if (isLoading) {
@@ -459,7 +464,7 @@ function Chat({
       </div>
 
       <div className="chat-input-area">
-        <QueuedMessages messages={queuedMessages} />
+        <QueuedMessages messages={queuedMessages} onRemove={handleRemoveQueued} />
         <ChatInput
           ref={chatInputRef}
           isLoading={isLoading}

@@ -46,6 +46,7 @@ import {
 } from "./utils";
 import { getProfilePort } from "./gateway-ports";
 import { readModels } from "./models";
+import { providerListSafe } from "./secrets";
 import { HIDDEN_SUBPROCESS_OPTIONS } from "./process-options";
 import { type Attachment, escapeXmlAttr } from "../shared/attachments";
 import { URL_KEY_MAP, OPENAI_COMPAT_PROVIDERS } from "../shared/url-key-map";
@@ -313,7 +314,16 @@ export async function transcribeAudio(
 
   // Resolve the provider key the same way the chat path does: URL-specific key
   // first, then the generic CUSTOM_API_KEY / OPENAI_API_KEY fallbacks.
-  const env = readEnv(resolved);
+  // The secrets provider's enumerable map is overlaid BENEATH the `.env` file
+  // (.env wins, mirroring the process.env > .env > provider order used
+  // everywhere else): a no-op for the default env provider, and the only way a
+  // `command`-provider user with vault-stored keys gets an Authorization header.
+  const baseEnv = readEnv(resolved);
+  const providerOverlay = providerListSafe(resolved);
+  const env: Record<string, string> = {};
+  for (const [k, v] of Object.entries(baseEnv)) if (v) env[k] = v;
+  for (const [k, v] of Object.entries(providerOverlay))
+    if (v && !env[k]) env[k] = v;
   let apiKey = "";
   for (const { pattern, envKey } of URL_KEY_MAP) {
     if (pattern.test(baseUrl)) {
@@ -741,7 +751,7 @@ function tuiGatewayPython(): string {
   return HERMES_PYTHON;
 }
 
-function tuiGatewayEnv(profile?: string): Record<string, string> {
+export function tuiGatewayEnv(profile?: string): Record<string, string> {
   const resolved = resolveProfile(profile);
   const envPathDelimiter = process.platform === "win32" ? ";" : ":";
   const env: Record<string, string> = {
@@ -759,6 +769,12 @@ function tuiGatewayEnv(profile?: string): Record<string, string> {
   if (resolved) env.HERMES_PROFILE = resolved;
   for (const [key, value] of Object.entries(readEnv(profile))) {
     if (value) env[key] = value;
+  }
+  // Overlay provider-enumerated secrets BENEATH the values above (fill only
+  // keys still absent), so a `command`-provider user gets the same resolved
+  // key set here as on the CLI fallback path: process.env > .env > provider.
+  for (const [key, value] of Object.entries(providerListSafe(profile))) {
+    if (value && !env[key]) env[key] = value;
   }
   return env;
 }
@@ -2134,10 +2150,20 @@ function sendMessageViaCli(
     "TINKER_API_KEY",
     "WANDB_API_KEY",
   ];
+  // Resolve the configured secrets provider's enumerable secrets ONCE (not
+  // per-key): a `command` backend would otherwise spawn the helper ~30 times
+  // synchronously here, freezing the main process if the helper blocks on an
+  // unlock prompt. list() runs the helper at most once. A bare-value helper that
+  // can't enumerate returns {} — those users resolve a key via the targeted
+  // getSecret() path elsewhere, never this broadcast loop (which would otherwise
+  // spray one secret across every vendor key name).
+  const providerSecrets = providerListSafe(profile);
   for (const key of KNOWN_API_KEYS) {
-    if (profileEnv[key] && !env[key]) {
-      env[key] = profileEnv[key];
-    }
+    if (env[key]) continue; // already present (e.g. from process.env spread)
+    // Prefer the .env file value, then the provider's enumerated secrets, so a
+    // vault-resolved key reaches the agent without being written to plaintext.
+    const value = profileEnv[key] || providerSecrets[key];
+    if (value) env[key] = value;
   }
 
   const isCustomEndpoint = OPENAI_COMPAT_PROVIDERS.has(mc.provider);
@@ -2605,7 +2631,13 @@ export async function sendMessage(
 
   const mc = getModelConfig(profile);
   if (CLI_COMPAT_PROVIDER_OVERRIDE[mc.provider]) {
-    return sendMessageViaCli(message, cb, profile, resumeSessionId, attachments);
+    return sendMessageViaCli(
+      message,
+      cb,
+      profile,
+      resumeSessionId,
+      attachments,
+    );
   }
 
   // Check API server availability when the cache is cold or known-bad. Once
@@ -2735,7 +2767,7 @@ function gatewayLogPath(profile?: string): string {
   return join(logDir, "gateway-stderr.log");
 }
 
-function buildGatewayEnv(profile?: string): Record<string, string> {
+export function buildGatewayEnv(profile?: string): Record<string, string> {
   // Make sure this profile's config.yaml enables the api_server and binds the
   // profile's own port before we spawn.
   ensureApiServerConfig(profile);
@@ -2757,6 +2789,16 @@ function buildGatewayEnv(profile?: string): Record<string, string> {
   const profileEnv = readEnv(profile);
   for (const [k, value] of Object.entries(profileEnv)) {
     if (value) {
+      gatewayEnv[k] = value;
+    }
+  }
+
+  // Overlay provider-enumerated secrets BENEATH the values above (fill only
+  // keys still absent), so a `command`-provider user gets the same resolved
+  // key set on the gateway-spawn path as on the CLI fallback path:
+  // process.env > .env > provider.
+  for (const [k, value] of Object.entries(providerListSafe(profile))) {
+    if (value && !gatewayEnv[k]) {
       gatewayEnv[k] = value;
     }
   }

@@ -125,7 +125,8 @@ import {
   setConnectionConfig,
   getPlatformEnabled,
   setPlatformEnabled,
-  getApiServerKey,
+  getApiServerKeyStatus,
+  invalidateSecretsCache,
 } from "./config";
 import {
   getAuxiliaryConfig,
@@ -787,9 +788,17 @@ function setupIPC(): void {
 
   // API_SERVER_KEY management — lets the renderer detect a missing key and
   // generate one with a button click (local mode) or show instructions (remote/SSH).
-  ipcMain.handle("get-api-server-key-status", (_event, profile?: string) => {
-    const key = getApiServerKey(profile);
-    return { hasKey: key.length > 0 };
+  // Additive shape: `hasKey` stays the required primary field; `providerId` /
+  // `checkedAt` are optional extras for a follow-up Settings/Gateway UI.
+  ipcMain.handle("get-api-server-key-status", (_event, profile?: string) =>
+    getApiServerKeyStatus(profile),
+  );
+
+  // Drops the cached secrets-provider values so the next status check re-reads
+  // the vault — lets the renderer's "Refresh from vault" button take effect
+  // immediately instead of waiting out the cache TTL.
+  ipcMain.handle("invalidate-secrets-cache", () => {
+    invalidateSecretsCache();
   });
 
   ipcMain.handle(

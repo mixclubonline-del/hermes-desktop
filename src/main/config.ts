@@ -10,6 +10,19 @@ import {
   safeWriteFile,
 } from "./utils";
 import { getYamlPath } from "./yaml-path";
+// NOTE: ./secrets imports back into this module (getConfigValue / readEnv), so
+// this is a static import that closes a cycle (config -> secrets ->
+// commandProvider -> config). It is safe ONLY because BOTH sides defer all work
+// to call time: config.ts calls the three fns below inside function bodies, and
+// secrets/index.ts constructs its providers LAZILY (no `new` at module-init).
+// If you make secrets/index.ts construct a provider at module scope again, this
+// static import will throw "X is not a constructor" on load-order-dependent
+// paths. Keep provider construction lazy there, or make this import lazy here.
+import {
+  getSecretsProvider,
+  providerListSafe,
+  invalidateProviderListCache,
+} from "./secrets";
 import { canonicalProviderBaseUrl } from "./provider-registry";
 import {
   expectedEnvKeyForUrl,
@@ -144,6 +157,23 @@ function invalidateCache(prefix: string): void {
   for (const key of _cache.keys()) {
     if (key.startsWith(prefix)) _cache.delete(key);
   }
+}
+
+/**
+ * Drop all secrets-related cache entries (the parsed `env:*` views and the
+ * resolved `apiServerKey:*` values, every profile). Call after a vault
+ * rotation / secrets-add / secrets-inject so the next `getSecret` /
+ * `getApiServerKey` lookup re-resolves through the live provider instead of
+ * serving a value cached up to 5s ago (which can 401 against a rotated key).
+ * Does NOT spawn the provider — it only clears cached values.
+ */
+export function invalidateSecretsCache(): void {
+  invalidateCache("env:");
+  invalidateCache("apiServerKey:");
+  // Also drop the secrets-layer list() cache so a vault rotation is visible
+  // on the next provider read (S1: that cache is the helper-spawn rate floor,
+  // explicit invalidation is the one sanctioned way to bust it early).
+  invalidateProviderListCache();
 }
 
 export function readEnv(profile?: string): Record<string, string> {
@@ -703,6 +733,25 @@ export function customEndpointKeyResolvable(
   for (const k of candidates) {
     if ((env[k] ?? "").trim()) return true;
   }
+  // Vault-aware: a `command` provider with any of the fallback keys
+  // configured in the vault satisfies the requirement too — don't
+  // return false and trigger a cascade of "MODEL_KEY_MISSING" / "set up
+  // provider" warnings for a vault-only user. NOTE: ./secrets is already
+  // statically imported at the top of this file, so this lazy require does
+  // NOT break a cycle (the cycle is already established and safe because
+  // secrets constructs its providers lazily). It is required at call time
+  // only so a test that resets modules re-binds the current ./secrets;
+  // collapsing it to the top-level static import would work equally well.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- call-time require (see note above); not a cycle-break — ./secrets is already statically imported at the top of this file.
+    const secretsMod = require("./secrets") as typeof import("./secrets");
+    const resolved = secretsMod.resolvedSecretMap(profile);
+    for (const k of candidates) {
+      if ((resolved[k] ?? "").trim()) return true;
+    }
+  } catch {
+    // secrets module not loadable — env-only view is the best we can do
+  }
   return false;
 }
 
@@ -931,6 +980,13 @@ export function getHermesHome(profile?: string): string {
 }
 
 /**
+ * `${providerId}:${profile}` pairs already warned about an unresolved
+ * API_SERVER_KEY — one diagnostic line per pair for the whole session, not one
+ * per chat message (getApiServerKey is a hot path).
+ */
+const warnedUnresolvedApiKey = new Set<string>();
+
+/**
  * Resolve the API server's shared secret. Honoured by the local hermes
  * gateway (`api_server.token` in `config.yaml` / `API_SERVER_KEY` in
  * `.env`) when present; the desktop must include it as
@@ -972,14 +1028,45 @@ export function getApiServerKey(profile?: string): string {
   const cached = getCached<string>(cacheKey);
   if (cached !== undefined) return cached;
 
-  const envForProfile = readEnv(profile);
+  // Overlay the secrets provider's enumerable map BENEATH the `.env` file view,
+  // mirroring the process.env > .env > provider resolution order used
+  // everywhere else: a key is filled from the provider only when neither the
+  // `.env` file nor process.env already has it. A no-op for the default env
+  // provider (its list() IS the `.env` map); for a `command`-provider user this
+  // is what lets a vault-stored API_SERVER_KEY reach the 6-source resolver (as
+  // its canonical `envProfile` arm — deliberately NOT a 7th source, so the
+  // env-provider resolve-precedence policy is unchanged). Copy before
+  // overlaying: readEnv() returns a shared cached object that must not be
+  // mutated with provider values.
+  const envForProfile: Record<string, string> = { ...readEnv(profile) };
+  let providerId = "env";
+  try {
+    providerId = getSecretsProvider(profile).id;
+    let contributed = 0;
+    for (const [k, v] of Object.entries(providerListSafe(profile))) {
+      if (v && !envForProfile[k] && !(process.env[k] ?? "").trim()) {
+        envForProfile[k] = v;
+        contributed++;
+      }
+    }
+    // Visible under --enable-logging so an overlay user can see it happening.
+    console.debug(
+      `[secrets] API_SERVER_KEY overlay: provider=${providerId}, contributed ${contributed} keys`,
+    );
+  } catch {
+    // secrets module not available — fall through to the env-only view
+  }
   const sources: ApiKeySources = {
     configTopLevelProfile: getConfigValue("API_SERVER_KEY", profile),
     configTopLevelDefault:
       profile && profile !== "default"
         ? getConfigValue("API_SERVER_KEY")
         : null,
-    envProfile: envForProfile.API_SERVER_KEY ?? null,
+    // Prefer the .env file value, then a runtime-injected one (e.g. a vault that
+    // unseals API_SERVER_KEY into the process environment rather than writing it
+    // to .env). This is the env arm of the secrets-provider resolution order.
+    envProfile:
+      envForProfile.API_SERVER_KEY ?? process.env.API_SERVER_KEY ?? null,
     envDefault:
       profile && profile !== "default"
         ? (readEnv().API_SERVER_KEY ?? null)
@@ -991,6 +1078,18 @@ export function getApiServerKey(profile?: string): string {
         : null,
   };
   const { value, source } = resolveApiServerKeyWithSource(sources);
+
+  // Diagnostic for "why is the key missing": one line naming the active
+  // provider, rate-limited per (provider, profile) so the hot path can't spam.
+  if (!value) {
+    const warnKey = `${providerId}:${profile || "default"}`;
+    if (!warnedUnresolvedApiKey.has(warnKey)) {
+      warnedUnresolvedApiKey.add(warnKey);
+      console.warn(
+        `[secrets] API_SERVER_KEY not resolved (provider=${providerId}, env=${profile || "default"})`,
+      );
+    }
+  }
 
   // Migration on read — if we resolved the key from a non-canonical
   // location AND the canonical `.env` slot is empty for this profile,
@@ -1039,6 +1138,31 @@ export function getApiServerKey(profile?: string): string {
 
   setCache(cacheKey, value);
   return value;
+}
+
+/**
+ * Wire shape of the `get-api-server-key-status` IPC channel. `hasKey` is the
+ * stable, required field existing renderer code relies on; `providerId` and
+ * `checkedAt` are ADDITIVE optional extras so a follow-up Settings/Gateway UI
+ * can distinguish "key resolved via vault" vs ".env" vs "missing".
+ */
+export interface ApiServerKeyStatus {
+  hasKey: boolean;
+  providerId?: string;
+  checkedAt?: number;
+}
+
+export function getApiServerKeyStatus(profile?: string): ApiServerKeyStatus {
+  const key = getApiServerKey(profile);
+  const status: ApiServerKeyStatus = { hasKey: key.length > 0 };
+  try {
+    const providerId = getSecretsProvider(profile).id;
+    if (providerId !== undefined) status.providerId = providerId;
+  } catch {
+    // secrets module unavailable — keep the legacy hasKey-only shape
+  }
+  status.checkedAt = Date.now();
+  return status;
 }
 
 /**

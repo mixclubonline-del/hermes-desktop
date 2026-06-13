@@ -1,4 +1,5 @@
 import { memo, useState } from "react";
+import { Grid } from "react-loader-spinner";
 import { Brain, ChevronRight, Spinner, Wrench } from "../../assets/icons";
 import { useI18n } from "../../components/useI18n";
 import { AttachmentChip } from "../../components/AttachmentChip";
@@ -229,7 +230,14 @@ export const ToolActivityGroup = memo(function ToolActivityGroup({
             }`}
           />
           {active ? (
-            <Spinner size={13} className="chat-tool-group-spinner" />
+            <Grid
+              height={13}
+              width={13}
+              radius={0}
+              color="var(--info, #4aa8ff)"
+              ariaLabel="tool-loading"
+              wrapperClass="chat-tool-group-spinner"
+            />
           ) : (
             <Wrench size={13} className="chat-tool-group-icon" />
           )}

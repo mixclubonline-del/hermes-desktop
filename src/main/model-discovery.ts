@@ -634,12 +634,14 @@ export async function getModelContextWindow(
 
   // A manual `model.context_length` override in config.yaml wins over /models
   // detection — it's what the user set explicitly and what the agent's
-  // auto-compaction threshold uses. Apply it only when it targets the model
-  // being asked about (the active model), so a stale value can't leak onto a
-  // different model id. This is the primary fix for providers (qwen, etc.)
-  // that don't advertise `context_length`, leaving the gauge on its heuristic.
+  // auto-compaction threshold uses. Apply it ONLY when it targets the model
+  // being asked about (an exact match against the active `model.default`), so a
+  // stale value can't leak onto a different model id — including the case where
+  // `model.default` is absent (override.model === ""), which must NOT match.
+  // This is the primary fix for providers (qwen, etc.) that don't advertise
+  // `context_length`, leaving the gauge on its heuristic.
   const override = getModelContextLengthOverride(profile);
-  if (override && (override.model === modelId || override.model === "")) {
+  if (override && override.model && override.model === modelId) {
     return override.contextLength;
   }
 

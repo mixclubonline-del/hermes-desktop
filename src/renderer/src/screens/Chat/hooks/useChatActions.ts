@@ -190,7 +190,13 @@ export function useChatActions({
   const runBackground = useCallback(
     async (question: string, attachments?: Attachment[]): Promise<void> => {
       if (!question) return;
-      if (runBackgroundViaDashboard) {
+      // `prompt.background` is text-only — it can't carry attachments. When the
+      // side question has attachments, fall back to the (blocking) quick-ask
+      // path, which sends them via `prompt.submit` and shows them in the bubble,
+      // so they're never silently dropped. Concurrent background is used only
+      // for the attachment-free case.
+      const hasAttachments = (attachments?.length ?? 0) > 0;
+      if (runBackgroundViaDashboard && !hasAttachments) {
         pushUser(`💭 ${question}`, "user-btw");
         const r = await runBackgroundViaDashboard(question);
         if (r.error) addAgentMessage?.(`error: ${r.error}`);

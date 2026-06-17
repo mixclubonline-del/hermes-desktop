@@ -584,6 +584,25 @@ describe("model-discovery", () => {
     expect(ctx).toBeNull();
   });
 
+  it("getModelContextWindow does not apply the override when model.default is absent", async () => {
+    // A hand-edited / partial config can carry context_length without a
+    // model.default. The override must NOT leak onto an arbitrary model id
+    // (regression: the old `override.model === ""` branch matched everything).
+    writeFileSync(
+      join(testHome, "config.yaml"),
+      ["model:", '  context_length: "65536"', ""].join("\n"),
+    );
+    const { getModelContextWindow } = await loadDiscovery();
+    const ctx = await getModelContextWindow(
+      "qwen",
+      "qwen-max",
+      undefined,
+      undefined,
+      undefined,
+    );
+    expect(ctx).toBeNull();
+  });
+
   it("getModelContextWindow returns null for providers without a /models endpoint", async () => {
     const { getModelContextWindow } = await loadDiscovery();
     const ctx = await getModelContextWindow(

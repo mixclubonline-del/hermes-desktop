@@ -8,14 +8,14 @@ export default {
   },
   analytics: {
     label: "发送匿名使用情况分析",
-    hint: "通过向项目的 PostHog 实例（托管于欧盟）发送匿名、聚合的使用数据来帮助改进 Hermes。您可以随时关闭。",
+    hint: "通过向项目的分析服务发送匿名、聚合的使用数据来帮助改进 Hermes。您可以随时关闭。",
     disclosure: {
       uuid: "仅存储在本设备上的每次安装的随机标识符（不包含姓名、电子邮件或账户信息）。",
       platform: "您的操作系统、Electron 版本和 Node.js 版本。",
       navigation:
         "您在应用内打开了哪些界面（例如聊天、会话、设置）。不会收集任何聊天内容、提示词、模型响应或文件内容。",
       endpoint:
-        "数据将发送至 eu.i.posthog.com（PostHog 欧盟云）。已禁用会话录制和页面浏览自动捕获。",
+        "数据将发送至 Hermes 分析服务（analytics.hermesone.org）。已禁用会话录制和页面浏览自动捕获。",
       notCollected:
         "永不收集：聊天消息、文件路径、API 密钥、模型配置、账户凭据。",
     },

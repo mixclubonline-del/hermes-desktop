@@ -38,7 +38,7 @@ import {
   Compass,
   Settings as SettingsIcon,
   Brain,
-  Wrench,
+  Workflow,
   Signal,
   Building,
   Layers,
@@ -77,14 +77,17 @@ const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   { view: "office", icon: Building, labelKey: "navigation.office" },
   { view: "kanban", icon: KanbanIcon, labelKey: "navigation.kanban" },
   { view: "models", icon: Layers, labelKey: "navigation.models" },
-  { view: "providers", icon: KeyRound, labelKey: "navigation.providers" },
   // "skills" lives under the Discover tab (installed + community), so it's no
   // longer a top-level nav item.
-  { view: "memory", icon: Brain, labelKey: "navigation.memory" },
-  { view: "tools", icon: Wrench, labelKey: "navigation.tools" },
   { view: "schedules", icon: Timer, labelKey: "navigation.schedules" },
-  { view: "gateway", icon: Signal, labelKey: "navigation.gateway" },
+];
+
+const FOOTER_NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
+  { view: "providers", icon: KeyRound, labelKey: "navigation.providers" },
   { view: "settings", icon: SettingsIcon, labelKey: "navigation.settings" },
+  { view: "gateway", icon: Signal, labelKey: "navigation.gateway" },
+  { view: "tools", icon: Workflow, labelKey: "navigation.tools" },
+  { view: "memory", icon: Brain, labelKey: "navigation.memory" },
 ];
 
 const SIDEBAR_COLLAPSED_KEY = "hermes.sidebar.collapsed";
@@ -468,7 +471,9 @@ function Layout({
         )) as DbHistoryItem[];
         const run = mintRun(activeProfile, dbItemsToChatMessages(items));
         run.sessionId = sessionId;
-        setRuns((prev) => openSessionRunTransition(prev, activeRunId, run).runs);
+        setRuns(
+          (prev) => openSessionRunTransition(prev, activeRunId, run).runs,
+        );
         setActiveRunId(run.runId);
         goTo("chat");
       } finally {
@@ -635,6 +640,19 @@ function Layout({
               )}
             </button>
           )}
+          <div className="sidebar-footer-actions" aria-label="Workspace tools">
+            {FOOTER_NAV_ITEMS.map(({ view: v, icon: Icon, labelKey }) => (
+              <button
+                key={v}
+                className={`sidebar-footer-action ${view === v ? "active" : ""}`}
+                onClick={() => goTo(v)}
+                aria-label={t(labelKey)}
+                data-tooltip={t(labelKey)}
+              >
+                <Icon size={16} />
+              </button>
+            ))}
+          </div>
           <ProfileSwitcher
             activeProfile={activeProfile}
             onSwitch={handleSelectProfile}

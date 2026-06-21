@@ -24,6 +24,12 @@ The footer profile switcher keeps the selected shell profile aligned with the vi
 
 Opening a sidebar session after switching profiles consumes that blank selected-profile run instead of appending beside it. [[src/renderer/src/screens/Layout/chatRuns.ts#openSessionRunTransition]] replaces the active scratch run when it belongs to the same profile as the resumed session, so the tab strip shows the previous session without an extra "New conversation" tab.
 
+## Footer action row
+
+Administrative destinations sit beside the profile switcher so the conversation nav stays short.
+
+[[src/renderer/src/screens/Layout/Layout.tsx#Layout]] keeps Providers, Settings, Gateway, Capabilities, and Memory out of the main sidebar list and renders them as icon-only footer actions immediately above [[src/renderer/src/screens/Layout/ProfileSwitcher.tsx#ProfileSwitcher]]. Each button exposes a styled hover/focus tooltip and accessible label, preserving discoverability while freeing vertical room for recent conversations.
+
 ## Provisional fresh sessions
 
 Fresh chat session ids are provisional until a turn produces output or completes successfully, so provider errors do not create visible recent-session rows.

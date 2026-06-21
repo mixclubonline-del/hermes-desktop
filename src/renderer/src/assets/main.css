@@ -1360,7 +1360,7 @@ body {
 }
 
 .sidebar {
-  width: 230px;
+  width: 250px;
   background: var(--bg-secondary);
   border-right: none;
   display: flex;
@@ -1451,18 +1451,22 @@ body {
 }
 
 .sidebar-nav {
-  flex: 1;
+  flex: 0 0 auto;
   padding: 0 8px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  /* When vertical space is tight (small screens, narrow windows), let
-   * the nav scroll instead of clipping the bottom items (Gateway,
-   * Settings). `min-height: 0` is required so the flex child can
-   * shrink below its content size — without it, `overflow-y: auto`
-   * never activates because the flex item refuses to shrink. #393. */
+}
+
+.sidebar-chat-section {
+  flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
+  min-width: 0;
+  padding: 8px 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
 }
 
 .sidebar-collapsed .sidebar-nav {
@@ -1470,22 +1474,33 @@ body {
   align-items: center;
 }
 
+.sidebar-collapsed .sidebar-chat-section {
+  flex: 0 0 auto;
+  min-height: auto;
+  padding: 8px 10px 0;
+  align-items: center;
+  overflow: visible;
+}
+
 .sidebar-nav-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 7px 14px;
+  padding: 7px 10px;
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition);
-  font-size: 12px;
-
-  color: var(--text-secondary);
+  font-size: 13px;
   border: none;
   background: none;
   width: 100%;
+  min-width: 0;
   text-align: left;
   font-family: var(--font-sans);
+}
+
+.sidebar-new-chat {
+  flex: 0 0 auto;
 }
 
 .sidebar-nav-label {
@@ -1522,87 +1537,64 @@ body {
 
 /* Collapsible Sessions section (ChatGPT-style recent chats) */
 .sidebar-nav-sessions {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-
-/* The Chat item and its chevron read as one container: the row owns the
-   hover/active background while the two buttons inside stay transparent and
-   remain separate click targets (Chat navigates, chevron toggles the list). */
-.sidebar-nav-row {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  border-radius: var(--radius-md);
-  transition: background var(--transition);
-}
-
-.sidebar-nav-row .sidebar-nav-item {
-  flex: 1;
+  min-height: 0;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
-/* Inner buttons keep their text-color states but defer the background to the
-   row, so the highlight spans the whole container rather than just one half. */
-.sidebar-nav-row .sidebar-nav-item,
-.sidebar-nav-row .sidebar-nav-item:hover,
-.sidebar-nav-row .sidebar-nav-item.active {
-  background: none;
+.sidebar-chat-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-.sidebar-nav-row:hover {
-  background: var(--bg-tertiary);
+.sidebar-chat-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
-/* Active wins over hover (higher specificity via :has), so hovering the active
-   row keeps the accent fill rather than flipping to the neutral hover tint. */
-.sidebar-nav-row:has(.sidebar-nav-item.active) {
-  background: var(--accent-subtle);
+.sidebar-chat-scrollbar {
+  position: absolute;
+  top: 0;
+  right: 3px;
+  bottom: 0;
+  z-index: 3;
+  width: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
 }
 
-.sidebar-nav-chevron {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: none;
-  background: none;
-  border-radius: var(--radius-md);
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: color var(--transition);
+.sidebar-chat-scrollbar.visible {
+  opacity: 1;
 }
 
-.sidebar-nav-row .sidebar-nav-chevron:hover {
-  /* Background comes from the row; just brighten the icon on hover. */
-  background: none;
-  color: var(--text-primary);
+.sidebar-chat-scrollbar-thumb {
+  width: 5px;
+  min-height: 32px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-muted) 70%, transparent);
 }
 
-/* Collapsed sidebar shows only the icon (no chevron), so revert to the
-   per-item background — a full-width row fill would extend past the 40px icon. */
-.sidebar-collapsed .sidebar-nav-row:hover {
-  background: none;
+.sidebar-collapsed .sidebar-nav-sessions {
+  flex: 0 0 auto;
 }
 
-.sidebar-collapsed .sidebar-nav-row:has(.sidebar-nav-item.active) {
-  background: none;
-}
-
-.sidebar-collapsed .sidebar-nav-row .sidebar-nav-item:hover {
-  background: var(--bg-tertiary);
-}
-
-.sidebar-collapsed .sidebar-nav-row .sidebar-nav-item.active {
-  background: var(--accent-subtle);
+.sidebar-collapsed .sidebar-chat-scroll {
+  display: none;
 }
 
 .sidebar-recent-sessions-wrap {
   display: grid;
+  min-width: 0;
   grid-template-rows: 0fr;
   transition:
     grid-template-rows 200ms ease,
@@ -1618,17 +1610,133 @@ body {
 .sidebar-recent-sessions {
   /* min-height:0 + overflow:hidden let the grid 0fr/1fr track clip cleanly. */
   min-height: 0;
+  min-width: 0;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-bottom: 2px;
+}
+
+.sidebar-recent-section {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-recent-section-toggle {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 3px;
+  padding: 4px 14px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  text-align: left;
+  transition:
+    background var(--transition),
+    color var(--transition);
+}
+
+.sidebar-recent-section-toggle:hover {
+  color: var(--text-secondary);
+}
+
+.sidebar-recent-section-toggle svg {
+  flex-shrink: 0;
+}
+
+.sidebar-recent-section-toggle span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-recent-disclosure-icon {
+  margin-left: auto;
+  color: var(--text-muted);
+}
+
+.sidebar-recent-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 180ms ease,
+    opacity 180ms ease;
+}
+
+.sidebar-recent-collapse.expanded {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.sidebar-recent-collapse-inner {
+  min-height: 0;
+  min-width: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 1px;
-  /* Align titles with the nav-item label (icon 16 + gap 10 + padding 14). */
-  padding-left: 14px;
-  margin-bottom: 2px;
+}
+
+.sidebar-recent-project {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sidebar-recent-project-heading {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 6px 14px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
+
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  transition:
+    background var(--transition),
+    color var(--transition);
+}
+
+.sidebar-recent-project-heading:hover {
+  background: var(--bg-tertiary);
+}
+
+.sidebar-recent-project-heading svg {
+  flex-shrink: 0;
+}
+
+.sidebar-recent-project-heading span {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sidebar-recent-sessions-wrap {
+  .sidebar-recent-sessions-wrap,
+  .sidebar-recent-collapse {
     transition: none;
   }
 }
@@ -1637,6 +1745,8 @@ body {
   display: flex;
   align-items: center;
   gap: 9px;
+  width: 100%;
+  min-width: 0;
   padding: 6px 10px;
   border: none;
   background: none;
@@ -1645,8 +1755,12 @@ body {
   text-align: left;
   font-family: var(--font-sans);
   font-size: 12px;
-  color: var(--text-secondary);
+
   transition: all var(--transition);
+}
+
+.sidebar-recent-session.project-child {
+  padding-left: 28px;
 }
 
 .sidebar-recent-session-dot {
@@ -1675,42 +1789,29 @@ body {
 }
 
 .sidebar-recent-session-title {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* "Show more" affordance under the recent list — opens the full-list modal. */
-.sidebar-recent-sessions-more {
+.sidebar-recent-empty {
+  padding: 6px 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.sidebar-recent-loading {
   display: flex;
   align-items: center;
   gap: 9px;
   padding: 6px 10px;
   margin-top: 1px;
-  border: none;
-  background: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  text-align: left;
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 500;
   color: var(--text-muted);
-  transition: all var(--transition);
-}
-
-.sidebar-recent-sessions-more-icon {
-  flex-shrink: 0;
-  color: var(--text-muted);
-}
-
-.sidebar-recent-sessions-more:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
-.sidebar-recent-sessions-more:hover .sidebar-recent-sessions-more-icon {
-  color: var(--text-primary);
 }
 
 /* Full-list sessions modal (sidebar "Show more" / Cmd+K). Reuses
@@ -9104,6 +9205,60 @@ body {
   margin-top: 2px;
 }
 
+/* Priority selector — JIRA-style chips with a colored severity bullet.
+   Wraps so it stays readable in the narrow create-task modal. */
+.kanban-prio-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.kanban-prio-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    border-color var(--transition),
+    background var(--transition),
+    color var(--transition);
+}
+
+.kanban-prio-chip:hover {
+  border-color: var(--border-bright);
+  color: var(--text-primary);
+}
+
+.kanban-prio-chip-active {
+  background: var(--accent-subtle);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.kanban-prio-bullet {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: var(--text-muted);
+}
+.kanban-prio-bullet[data-prio="p0"] {
+  background: var(--error);
+}
+.kanban-prio-bullet[data-prio="p1"] {
+  background: var(--warning);
+}
+.kanban-prio-bullet[data-prio="p2"] {
+  background: var(--accent);
+}
+
 .schedules-freq-pills {
   display: flex;
   gap: 2px;
@@ -11197,7 +11352,11 @@ body {
 .kanban-columns {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(6, minmax(220px, 1fr));
+  /* Column count is dynamic (8 canonical statuses, +1 when archived is shown),
+     so auto-flow columns rather than a fixed track count; the board scrolls
+     horizontally like a JIRA board when the lanes overflow. */
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(232px, 1fr);
   gap: 10px;
   overflow-x: auto;
   overflow-y: hidden;
@@ -11211,6 +11370,9 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   min-height: 0;
+  /* Clip the header's colored top accent to the lane's rounded corners,
+     otherwise the inset status bar shows square corners over the radius. */
+  overflow: hidden;
 }
 
 .kanban-column-header {
@@ -11237,6 +11399,72 @@ body {
   background: var(--bg-tertiary);
   padding: 1px 7px;
   border-radius: 999px;
+}
+
+/* JIRA-style colored status dot. Hues are fixed per status (independent of the
+   active theme) so a status reads the same everywhere — matching how issue
+   trackers color their status lozenges. Most map to the theme's semantic vars;
+   running (teal "live") and review (purple) have no theme equivalent. */
+.kanban-column-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: var(--text-muted);
+}
+.kanban-column-dot[data-tone="neutral"] {
+  background: var(--text-muted);
+}
+.kanban-column-dot[data-tone="todo"] {
+  background: var(--text-secondary);
+}
+.kanban-column-dot[data-tone="scheduled"] {
+  background: var(--warning);
+}
+.kanban-column-dot[data-tone="ready"] {
+  background: var(--accent);
+}
+.kanban-column-dot[data-tone="running"] {
+  background: #14b8a6;
+}
+.kanban-column-dot[data-tone="blocked"] {
+  background: var(--error);
+}
+.kanban-column-dot[data-tone="review"] {
+  background: #a855f7;
+}
+.kanban-column-dot[data-tone="done"] {
+  background: var(--success);
+}
+.kanban-column-dot[data-tone="archived"] {
+  background: var(--text-muted);
+  opacity: 0.6;
+}
+
+/* Faint top accent on each lane header, tinted to the column's status. */
+.kanban-column-header {
+  gap: 8px;
+}
+.kanban-column-header .kanban-column-count {
+  margin-left: auto;
+}
+.kanban-column[data-tone="scheduled"] .kanban-column-header {
+  box-shadow: inset 0 2px 0 0 color-mix(in srgb, var(--warning) 60%, transparent);
+}
+.kanban-column[data-tone="ready"] .kanban-column-header {
+  box-shadow: inset 0 2px 0 0 color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.kanban-column[data-tone="running"] .kanban-column-header {
+  box-shadow: inset 0 2px 0 0 color-mix(in srgb, #14b8a6 60%, transparent);
+}
+.kanban-column[data-tone="blocked"] .kanban-column-header {
+  box-shadow: inset 0 2px 0 0 color-mix(in srgb, var(--error) 60%, transparent);
+}
+.kanban-column[data-tone="review"] .kanban-column-header {
+  box-shadow: inset 0 2px 0 0 color-mix(in srgb, #a855f7 60%, transparent);
+}
+.kanban-column[data-tone="done"] .kanban-column-header {
+  box-shadow: inset 0 2px 0 0 color-mix(in srgb, var(--success) 60%, transparent);
 }
 
 .kanban-column-body {
@@ -11289,12 +11517,130 @@ body {
   border-radius: var(--radius-md);
 }
 
+.kanban-card {
+  position: relative;
+}
+
+/* Left priority accent bar — the JIRA "issue priority" cue. Only present when
+   the card carries a data-prio (P0/P1/P2); normal-priority cards have none. */
+.kanban-card[data-prio]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  background: var(--text-muted);
+}
+.kanban-card[data-prio="p0"]::before {
+  background: var(--error);
+}
+.kanban-card[data-prio="p1"]::before {
+  background: var(--warning);
+}
+.kanban-card[data-prio="p2"]::before {
+  background: var(--accent);
+}
+
+.kanban-card-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kanban-card-id {
+  font-family: var(--font-mono, ui-monospace, "SF Mono", monospace);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+.kanban-card-age {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Pulsing "live" dot on running cards. */
+.kanban-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #14b8a6;
+  box-shadow: 0 0 0 0 color-mix(in srgb, #14b8a6 70%, transparent);
+  animation: kanban-live-pulse 1.6s ease-out infinite;
+}
+@keyframes kanban-live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, #14b8a6 60%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 5px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
 .kanban-card-title {
   font-size: 13px;
   font-weight: 500;
   color: var(--text-primary);
   line-height: 1.3;
   word-break: break-word;
+}
+
+/* Assignee avatar chip (initials) + name. */
+.kanban-assignee {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.kanban-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+  font-size: 9px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.kanban-avatar-none {
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+}
+.kanban-assignee-name {
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 96px;
+}
+.kanban-assignee-none {
+  opacity: 0.7;
+}
+
+.kanban-pill-skills {
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+}
+
+/* Priority pill tones (used in the card header next to the id). */
+.kanban-pill-prio[data-prio="p0"] {
+  background: var(--error-bg);
+  color: var(--error);
+}
+.kanban-pill-prio[data-prio="p1"] {
+  background: var(--warning-bg);
+  color: var(--warning);
 }
 
 .kanban-card-meta {
@@ -11515,6 +11861,63 @@ body {
 .kanban-event-time {
   font-size: 11px;
   color: var(--text-muted);
+}
+
+/* Active state for the "show archived" toolbar toggle. */
+.kanban-toggle-active {
+  background: var(--accent-subtle) !important;
+  color: var(--accent-text) !important;
+  border-color: var(--accent-subtle) !important;
+}
+
+/* Status pill with a leading tone dot (used in the detail drawer header). */
+.kanban-pill-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ---- Detail drawer (right-docked JIRA issue panel) ---- */
+.kanban-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg-primary) 40%, transparent);
+  z-index: 50;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.kanban-detail-drawer {
+  width: min(460px, 92vw);
+  height: 100%;
+  /* Clear the window's title-bar/tabs strip (.active-sessions-bar, z 1001,
+     ~34px) which paints above this overlay — without this the drawer's
+     header title is hidden behind it. */
+  padding-top: 38px;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  box-shadow: -8px 0 24px -12px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: kanban-drawer-in 0.18s ease-out;
+}
+@keyframes kanban-drawer-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+.kanban-detail-drawer .schedules-modal-header {
+  flex-shrink: 0;
+}
+.kanban-detail-drawer .schedules-modal-body {
+  flex: 1;
+  overflow-y: auto;
 }
 
 /* ========================================================================

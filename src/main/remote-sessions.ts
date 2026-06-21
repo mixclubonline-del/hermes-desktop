@@ -237,6 +237,7 @@ function normalizeCachedSession(row: RemoteRecord): CachedSession {
     source: summary.source,
     messageCount: summary.messageCount,
     model: summary.model,
+    contextFolder: null,
   };
 }
 

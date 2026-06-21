@@ -180,10 +180,18 @@ function Chat({
   // stored folder is never clobbered by the initial null.
   useEffect(() => {
     if (!hermesSessionId || !contextFolderLoadedRef.current) return;
-    void window.hermesAPI.setSessionContextFolder(
-      hermesSessionId,
-      contextFolder,
-    );
+    void window.hermesAPI
+      .setSessionContextFolder(hermesSessionId, contextFolder)
+      .then(() => {
+        window.dispatchEvent(
+          new CustomEvent("hermes-session-context-folder-changed", {
+            detail: { sessionId: hermesSessionId },
+          }),
+        );
+      })
+      .catch(() => {
+        /* best-effort sidebar refresh signal */
+      });
   }, [hermesSessionId, contextFolder]);
   // Whether the worktree panel is visible (only applies when contextFolder is set)
   // Default false so the panel doesn't open automatically and interfere with scrolling

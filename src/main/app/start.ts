@@ -79,7 +79,7 @@ export function startMainProcess(): void {
           ...details.responseHeaders,
           "Content-Security-Policy": [
             "default-src 'self'; " +
-              "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://*.posthog.com https://*.i.posthog.com; " +
+              "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; " +
               "style-src 'self' 'unsafe-inline'; " +
               "img-src 'self' data: blob: file: https:; " +
               "media-src 'self' data: blob: file: https:; " +

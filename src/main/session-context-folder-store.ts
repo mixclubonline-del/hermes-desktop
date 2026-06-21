@@ -69,6 +69,39 @@ export function getSessionContextFolder(sessionId: string): string | null {
 }
 
 /**
+ * Batch-read the folders linked to many sessions in a single pass: one
+ * `tableExists` check and one chunked `IN (...)` query instead of two queries
+ * per session. Used by the session cache so attaching folders to a full page
+ * of rows stays a couple of queries rather than O(N). Sessions with no linked
+ * folder are simply absent from the returned map.
+ */
+export function getSessionContextFolders(
+  sessionIds: string[],
+): Map<string, string> {
+  const result = new Map<string, string>();
+  if (sessionIds.length === 0) return result;
+  const db = getDbConnection(true);
+  if (!db || !tableExists(db)) return result;
+
+  // Chunk well under SQLITE_MAX_VARIABLE_NUMBER for portability, matching the
+  // batching used elsewhere in the session cache.
+  const CHUNK = 500;
+  for (let i = 0; i < sessionIds.length; i += CHUNK) {
+    const chunk = sessionIds.slice(i, i + CHUNK);
+    const placeholders = chunk.map(() => "?").join(", ");
+    const rows = db
+      .prepare(
+        `SELECT session_id, folder_path FROM ${TABLE} WHERE session_id IN (${placeholders})`,
+      )
+      .all(...chunk) as Array<{ session_id: string; folder_path: string }>;
+    for (const r of rows) {
+      if (r.folder_path) result.set(r.session_id, r.folder_path);
+    }
+  }
+  return result;
+}
+
+/**
  * Drop a session's linked-folder row. Called from `deleteSessionRows` so it
  * runs inside the same delete transaction as the other per-session cleanup.
  */

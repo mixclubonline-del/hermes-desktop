@@ -1,6 +1,10 @@
 export default {
   chat: "Chat",
+  newChat: "Obrolan Baru",
   sessions: "Sesi",
+  projects: "Proyek",
+  chats: "Obrolan",
+  noChats: "Tidak ada obrolan",
   agents: "Profil",
   office: "Office",
   models: "Model",

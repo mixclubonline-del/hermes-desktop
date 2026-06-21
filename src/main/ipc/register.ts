@@ -42,7 +42,7 @@ import { fetchRegistry, fetchModelRegistry, fetchRegistryDetail, listInstalledRe
 import { listInstalledSkills, listBundledSkills, getSkillContent, installSkill, uninstallSkill } from "../skills";
 import { listCronJobs, createCronJob, removeCronJob, pauseCronJob, resumeCronJob, triggerCronJob } from "../cronjobs";
 import { applyMessagingPlatformUpdate, buildDesktopMessagingPlatforms, fetchRemoteMessagingPlatforms, readLocalGatewayPlatformStates, testDesktopMessagingPlatform, testRemoteMessagingPlatform, updateRemoteMessagingPlatform } from "../messaging-platforms";
-import { listBoards as kanbanListBoards, currentBoard as kanbanCurrentBoard, switchBoard as kanbanSwitchBoard, createBoard as kanbanCreateBoard, removeBoard as kanbanRemoveBoard, listTasks as kanbanListTasks, getTask as kanbanGetTask, createTask as kanbanCreateTask, assignTask as kanbanAssignTask, completeTask as kanbanCompleteTask, blockTask as kanbanBlockTask, unblockTask as kanbanUnblockTask, archiveTask as kanbanArchiveTask, specifyTask as kanbanSpecifyTask, reclaimTask as kanbanReclaimTask, commentTask as kanbanCommentTask, dispatchOnce as kanbanDispatchOnce, listClaw3dHqTasks as kanbanListClaw3dHqTasks, type CreateTaskInput } from "../kanban";
+import { listBoards as kanbanListBoards, currentBoard as kanbanCurrentBoard, switchBoard as kanbanSwitchBoard, createBoard as kanbanCreateBoard, removeBoard as kanbanRemoveBoard, listTasks as kanbanListTasks, getTask as kanbanGetTask, createTask as kanbanCreateTask, assignTask as kanbanAssignTask, completeTask as kanbanCompleteTask, blockTask as kanbanBlockTask, unblockTask as kanbanUnblockTask, archiveTask as kanbanArchiveTask, promoteTask as kanbanPromoteTask, scheduleTask as kanbanScheduleTask, specifyTask as kanbanSpecifyTask, reclaimTask as kanbanReclaimTask, commentTask as kanbanCommentTask, dispatchOnce as kanbanDispatchOnce, listClaw3dHqTasks as kanbanListClaw3dHqTasks, type CreateTaskInput } from "../kanban";
 import { getAppLocale, setAppLocale } from "../locale";
 import { sshListInstalledSkills, sshGetSkillContent, sshInstallSkill, sshUninstallSkill, sshListBundledSkills, sshReadMemory, sshAddMemoryEntry, sshUpdateMemoryEntry, sshRemoveMemoryEntry, sshWriteUserProfile, sshReadSoul, sshWriteSoul, sshResetSoul, sshGetToolsets, sshGetPlatformToolsets, sshSetToolsetEnabled, sshSetMessagingPlatformToolsetEnabled, sshReadEnv, sshSetEnvValue, sshGetConfigValue, sshSetConfigValue, sshGetHermesHome, sshGetModelConfig, sshSetModelConfig, sshListSessions, sshGetSessionMessages, sshSearchSessions, sshListProfiles, sshCreateProfile, sshDeleteProfile, sshGatewayStatus, sshStartGateway, sshStopGateway, sshReadRemoteApiKey, sshReadDirectory, sshGetHermesVersion, sshReadLogs, sshGetPlatformEnabled, sshSetPlatformEnabled, sshListCachedSessions, sshRunDoctor, sshListModels, sshAddModel, sshRemoveModel, sshUpdateModel, sshRunUpdate, sshRunDump, sshDiscoverMemoryProviders } from "../ssh-remote";
 
@@ -1986,6 +1986,16 @@ export function registerIpcHandlers(context: IpcContext): void {
     "kanban-archive-task",
     (_event, taskId: string, profile?: string) =>
       kanbanArchiveTask(taskId, profile),
+  );
+  ipcMain.handle(
+    "kanban-promote-task",
+    (_event, taskId: string, profile?: string) =>
+      kanbanPromoteTask(taskId, profile),
+  );
+  ipcMain.handle(
+    "kanban-schedule-task",
+    (_event, taskId: string, reason?: string, profile?: string) =>
+      kanbanScheduleTask(taskId, reason, profile),
   );
   ipcMain.handle(
     "kanban-specify-task",

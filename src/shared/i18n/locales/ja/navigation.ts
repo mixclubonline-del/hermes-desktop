@@ -1,6 +1,10 @@
 export default {
   chat: "チャット",
+  newChat: "新しいチャット",
   sessions: "セッション",
+  projects: "プロジェクト",
+  chats: "チャット",
+  noChats: "チャットなし",
   agents: "プロファイル",
   office: "オフィス",
   models: "モデル",

@@ -43,7 +43,6 @@
     "highlight.js": "^11.11.1",
     "i18next": "^25.6.0",
     "lucide-react": "^1.7.0",
-    "posthog-js": "^1.376.0",
     "react-file-icon": "^1.6.0",
     "react-hot-toast": "^2.6.0",
     "react-i18next": "^15.7.3",

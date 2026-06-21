@@ -33,7 +33,6 @@ import RemoteNotice from "../../components/RemoteNotice";
 import VerifyWarningBanner from "../../components/VerifyWarningBanner";
 import hermeslogo from "../../assets/hermes-one.svg";
 import {
-  ChatBubble,
   Compass,
   Settings as SettingsIcon,
   Brain,
@@ -46,8 +45,7 @@ import {
   Download,
   PanelLeftClose,
   PanelLeftOpen,
-  ChevronDown,
-  ChevronRight,
+  Plus,
 } from "../../assets/icons";
 import type { LucideIcon } from "lucide-react";
 import { useI18n } from "../../components/useI18n";
@@ -66,8 +64,7 @@ type View =
   | "gateway"
   | "settings";
 
-const NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
-  { view: "chat", icon: ChatBubble, labelKey: "navigation.chat" },
+const PINNED_NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   { view: "discover", icon: Compass, labelKey: "navigation.discover" },
   // "agents" (Profiles) is reached from the sidebar-footer ProfileSwitcher's
   // "Manage profiles" action rather than a top-level nav item.
@@ -87,7 +84,7 @@ const FOOTER_NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
 ];
 
 const SIDEBAR_COLLAPSED_KEY = "hermes.sidebar.collapsed";
-const SESSIONS_EXPANDED_KEY = "hermes.sidebar.sessionsExpanded";
+const SIDEBAR_SCROLLBAR_HIDE_MS = 700;
 
 interface LayoutProps {
   verifyWarning?: boolean;
@@ -117,6 +114,16 @@ function Layout({
   // otherwise mount two tabs for the same session (the live check straddles an
   // await, so it can't rely on `runs` state alone).
   const resumingRef = useRef<Set<string>>(new Set());
+  const sidebarChatScrollRef = useRef<HTMLDivElement | null>(null);
+  const sidebarScrollbarHideRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const [sidebarScrollbar, setSidebarScrollbar] = useState({
+    visible: false,
+    scrollable: false,
+    top: 0,
+    height: 0,
+  });
 
   const currentSessionId =
     runs.find((r) => r.runId === activeRunId)?.sessionId ?? null;
@@ -125,6 +132,78 @@ function Layout({
     () => deriveLoadingSessionIds(runs),
     [runs],
   );
+
+  const updateSidebarScrollbar = useCallback((visible: boolean) => {
+    const root = sidebarChatScrollRef.current;
+    if (!root) {
+      setSidebarScrollbar((prev) =>
+        prev.scrollable || prev.visible
+          ? { visible: false, scrollable: false, top: 0, height: 0 }
+          : prev,
+      );
+      return;
+    }
+
+    const scrollable = root.scrollHeight > root.clientHeight + 1;
+    if (!scrollable) {
+      setSidebarScrollbar((prev) =>
+        prev.scrollable || prev.visible
+          ? { visible: false, scrollable: false, top: 0, height: 0 }
+          : prev,
+      );
+      return;
+    }
+
+    const trackHeight = root.clientHeight;
+    const thumbHeight = Math.max(
+      32,
+      Math.round((root.clientHeight / root.scrollHeight) * trackHeight),
+    );
+    const maxTop = Math.max(0, trackHeight - thumbHeight);
+    const maxScroll = Math.max(1, root.scrollHeight - root.clientHeight);
+    const top = Math.round((root.scrollTop / maxScroll) * maxTop);
+
+    setSidebarScrollbar((prev) => {
+      const next = { visible, scrollable, top, height: thumbHeight };
+      return prev.visible === next.visible &&
+        prev.scrollable === next.scrollable &&
+        prev.top === next.top &&
+        prev.height === next.height
+        ? prev
+        : next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const root = sidebarChatScrollRef.current;
+    if (!root) return;
+
+    const showThenHide = (): void => {
+      updateSidebarScrollbar(true);
+      if (sidebarScrollbarHideRef.current) {
+        clearTimeout(sidebarScrollbarHideRef.current);
+      }
+      sidebarScrollbarHideRef.current = setTimeout(() => {
+        updateSidebarScrollbar(false);
+      }, SIDEBAR_SCROLLBAR_HIDE_MS);
+    };
+
+    const updateHidden = (): void => updateSidebarScrollbar(false);
+    root.addEventListener("scroll", showThenHide, { passive: true });
+    window.addEventListener("resize", updateHidden);
+    const observer = new ResizeObserver(updateHidden);
+    observer.observe(root);
+
+    updateHidden();
+    return () => {
+      root.removeEventListener("scroll", showThenHide);
+      window.removeEventListener("resize", updateHidden);
+      observer.disconnect();
+      if (sidebarScrollbarHideRef.current) {
+        clearTimeout(sidebarScrollbarHideRef.current);
+      }
+    };
+  }, [updateSidebarScrollbar]);
 
   // Per-profile avatar/colour, so the active-sessions bar (which only knows a
   // run's profile name) can render real avatars. Refreshed when the selected
@@ -174,15 +253,6 @@ function Layout({
       return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
     } catch {
       return false;
-    }
-  });
-  // Recent-sessions list under the Chat nav item expanded → shows the last few
-  // chats inline (ChatGPT-style). Defaults to expanded; persisted across launches.
-  const [sessionsExpanded, setSessionsExpanded] = useState(() => {
-    try {
-      return localStorage.getItem(SESSIONS_EXPANDED_KEY) !== "false";
-    } catch {
-      return true;
     }
   });
   // Full-list sessions modal (opened from the sidebar "Show more" affordance or
@@ -492,18 +562,6 @@ function Layout({
     });
   }, []);
 
-  const toggleSessionsExpanded = useCallback(() => {
-    setSessionsExpanded((expanded) => {
-      const next = !expanded;
-      try {
-        localStorage.setItem(SESSIONS_EXPANDED_KEY, String(next));
-      } catch {
-        /* ignore persistence failures */
-      }
-      return next;
-    });
-  }, []);
-
   const sidebarToggleLabel = sidebarCollapsed
     ? t("navigation.expandSidebar")
     : t("navigation.collapseSidebar");
@@ -537,56 +595,21 @@ function Layout({
           </button>
         </div>
 
-        <nav className="sidebar-nav">
-          {NAV_ITEMS.map(({ view: v, icon: Icon, labelKey }) => {
-            if (v === "chat") {
-              // The recent-sessions list lives under the Chat item (the
-              // standalone Sessions view was removed — the full list now opens
-              // in a modal via "Show more").
-              const recentToggleLabel = sessionsExpanded
-                ? t("navigation.hideRecentSessions")
-                : t("navigation.showRecentSessions");
-              return (
-                <div key={v} className="sidebar-nav-sessions">
-                  <div className="sidebar-nav-row">
-                    <button
-                      className={`sidebar-nav-item ${view === v ? "active" : ""}`}
-                      onClick={() => goTo(v)}
-                      title={t(labelKey)}
-                      aria-label={t(labelKey)}
-                    >
-                      <Icon size={16} />
-                      <span className="sidebar-nav-label">{t(labelKey)}</span>
-                    </button>
-                    {!sidebarCollapsed && (
-                      <button
-                        className="sidebar-nav-chevron"
-                        type="button"
-                        onClick={toggleSessionsExpanded}
-                        title={recentToggleLabel}
-                        aria-label={recentToggleLabel}
-                        aria-expanded={sessionsExpanded}
-                      >
-                        {sessionsExpanded ? (
-                          <ChevronDown size={14} />
-                        ) : (
-                          <ChevronRight size={14} />
-                        )}
-                      </button>
-                    )}
-                  </div>
-                  <SidebarRecentSessions
-                    open={sessionsExpanded && !sidebarCollapsed}
-                    activeProfile={activeProfile}
-                    currentSessionId={currentSessionId}
-                    loadingSessionIds={loadingSessionIds}
-                    resumingSessionId={resumingSessionId}
-                    onSelect={handleResumeSession}
-                    onShowMore={() => setSessionsModalOpen(true)}
-                  />
-                </div>
-              );
-            }
+        <nav className="sidebar-nav sidebar-nav-pinned">
+          <button
+            className={`sidebar-nav-item sidebar-new-chat ${
+              view === "chat" && currentSessionId === null ? "active" : ""
+            }`}
+            onClick={handleNewChat}
+            title={t("navigation.newChat")}
+            aria-label={t("navigation.newChat")}
+          >
+            <Plus size={16} />
+            <span className="sidebar-nav-label">
+              {t("navigation.newChat")}
+            </span>
+          </button>
+          {PINNED_NAV_ITEMS.map(({ view: v, icon: Icon, labelKey }) => {
             return (
               <button
                 key={v}
@@ -601,6 +624,38 @@ function Layout({
             );
           })}
         </nav>
+
+        <div className="sidebar-chat-section">
+          <div className="sidebar-nav-sessions">
+            <div className="sidebar-chat-scroll" ref={sidebarChatScrollRef}>
+              <SidebarRecentSessions
+                open={!sidebarCollapsed}
+                activeProfile={activeProfile}
+                currentSessionId={currentSessionId}
+                loadingSessionIds={loadingSessionIds}
+                resumingSessionId={resumingSessionId}
+                onSelect={handleResumeSession}
+                scrollRootRef={sidebarChatScrollRef}
+              />
+            </div>
+            {sidebarScrollbar.scrollable && (
+              <div
+                className={`sidebar-chat-scrollbar ${
+                  sidebarScrollbar.visible ? "visible" : ""
+                }`}
+                aria-hidden="true"
+              >
+                <div
+                  className="sidebar-chat-scrollbar-thumb"
+                  style={{
+                    height: sidebarScrollbar.height,
+                    transform: `translateY(${sidebarScrollbar.top}px)`,
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        </div>
 
         <div className="sidebar-footer">
           {/* Show an upgrade affordance at startup when GitHub has a newer

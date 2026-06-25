@@ -39,8 +39,18 @@ export const ModelPicker = memo(function ModelPicker({
         setIsOpen(false);
       }
     }
+    function handleKeyDown(e: KeyboardEvent): void {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setIsOpen(false);
+      }
+    }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown, true);
+    };
   }, [isOpen]);
 
   const onOpenRef = useRef(onOpen);
@@ -105,13 +115,27 @@ export const ModelPicker = memo(function ModelPicker({
       </button>
 
       {isOpen && (
-        <div className="chat-model-dropdown">
+        <div
+          className="chat-model-dropdown"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              setIsOpen(false);
+            }
+          }}
+        >
           <input
             ref={searchRef}
             className="chat-model-search-input"
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                setIsOpen(false);
+              }
+            }}
             placeholder={t("chat.searchModels")}
           />
           {filteredGroups.map((group) => (
@@ -146,6 +170,10 @@ export const ModelPicker = memo(function ModelPicker({
                 onChange={(e) => setCustomInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") submitCustom();
+                  if (e.key === "Escape") {
+                    e.stopPropagation();
+                    setIsOpen(false);
+                  }
                 }}
                 placeholder={t("chat.typeModelName")}
               />

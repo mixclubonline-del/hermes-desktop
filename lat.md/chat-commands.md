@@ -86,4 +86,6 @@ Visual presentation in the autocomplete popup is handled by [[src/renderer/src/s
 
 Typing `/` opens a centered command palette in [[src/renderer/src/screens/Chat/ChatInput.tsx#ChatInput]] while the composer retains keyboard focus. Results filter by name or description, stay grouped by category, and support arrows, Enter or Tab, and Escape.
 
+Escape is captured at the document level while the palette is open, so it closes even if focus has moved from the composer into a command row. Dismissal preserves the slash draft and returns focus to the composer.
+
 The palette pre-normalizes searchable command metadata and virtualizes its grouped rows through [[src/renderer/src/screens/Chat/slash/virtualSlashCommands.ts#createSlashCommandVirtualLayout]]. Only visible rows plus a small overscan are mounted, while keyboard selection uses calculated offsets.

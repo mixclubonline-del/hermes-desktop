@@ -261,6 +261,19 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       return () => observer.disconnect();
     }, [slashMenuOpen]);
 
+    useEffect(() => {
+      if (!slashMenuOpen) return;
+      function handleGlobalEscape(event: KeyboardEvent): void {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        setSlashMenuOpen(false);
+        inputRef.current?.focus();
+      }
+      document.addEventListener("keydown", handleGlobalEscape, true);
+      return () =>
+        document.removeEventListener("keydown", handleGlobalEscape, true);
+    }, [slashMenuOpen]);
+
     const searchableSlashCommands = useMemo(
       () =>
         slashCommands.map((command) => ({
@@ -565,7 +578,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                           size={10}
                         />
                         <span className="slash-menu-item-name">
-                          {row.command.name}
+                          {row.command.name?.replace(/^\//, "")}
                         </span>
                         <span className="slash-menu-item-desc">
                           {row.command.description}

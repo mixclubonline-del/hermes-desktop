@@ -88,14 +88,17 @@ describe("ChatInput — slash command palette", () => {
     expect(screen.queryByText("/agents")).toBeNull();
   });
 
-  it("closes with Escape while keeping the draft", () => {
+  it("closes with Escape from anywhere in the modal while keeping the draft", () => {
     const { textarea } = renderInput();
 
     fireEvent.change(textarea, { target: { value: "/lea" } });
-    fireEvent.keyDown(textarea, { key: "Escape" });
+    const option = screen.getByRole("option", { name: /learn/i });
+    option.focus();
+    fireEvent.keyDown(option, { key: "Escape" });
 
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(textarea.value).toBe("/lea");
+    expect(document.activeElement).toBe(textarea);
   });
 
   it("virtualizes large command catalogs", () => {

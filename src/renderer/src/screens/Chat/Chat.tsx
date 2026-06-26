@@ -97,9 +97,10 @@ interface ChatProps {
   profile?: string;
   onSessionStarted?: () => void;
   onNewChat?: () => void;
-  /** Optional callback to navigate to Settings → Diagnose section
-   *  when the user clicks "Show details" in the config-health banner. */
-  onOpenDiagnose?: () => void;
+  /** Optional callback to open Settings — from the config-health banner's
+   *  "Show details" (no section) or a `/settings <section>` command, which
+   *  passes the section name to scroll to. */
+  onOpenDiagnose?: (section?: string) => void;
   /** Reports the agent generating state so the sidebar / active-sessions bar
    *  can show a spinner on each running session. */
   onLoadingChange?: (runId: string, loading: boolean) => void;

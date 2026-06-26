@@ -48,7 +48,9 @@ interface UseChatActionsArgs {
   chatInputRef: React.RefObject<ChatInputHandle | null>;
   localCommands: LocalCommands;
   slashCatalog: SlashCommandCatalog;
-  onOpenSettings?: () => void;
+  /** Open Desktop settings, optionally scrolling to a named section
+   *  (e.g. `/settings appearance`). */
+  onOpenSettings?: (section?: string) => void;
   activeTurnRef: React.MutableRefObject<ActiveTurn | null>;
   /** Working folder bound to this conversation (issue #27), or null. */
   contextFolder: string | null;
@@ -262,7 +264,9 @@ export function useChatActions({
         );
         const turn = shouldShowUser ? pushUser(text) : createTurn("slash");
         const startIndex = messagesRef.current.length;
-        const pendingId = `slash-${createTurn("slash").turnId}`;
+        // Reuse this turn's id for the pending loader bubble rather than
+        // minting a second throwaway turn — keeps the loader correlated to it.
+        const pendingId = `slash-${turn.turnId}`;
         const showPending = definition?.target === "agent";
         if (showPending) {
           setMessages((prev) => [
@@ -334,7 +338,7 @@ export function useChatActions({
             );
             return `**Available commands**\n\n${sections.join("\n\n")}`;
           },
-          openSettings: () => onOpenSettings?.(),
+          openSettings: (section) => onOpenSettings?.(section),
           openDialog: () => undefined,
           startNewChat: () => onSessionStarted?.(),
           clearTranscript: () => undefined,

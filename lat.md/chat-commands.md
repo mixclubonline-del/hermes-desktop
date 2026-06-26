@@ -73,6 +73,8 @@ Desktop commands in [[src/renderer/src/screens/Chat/slash/desktopCommands.ts#DES
 
 Pure UI desktop actions are flagged `uiAction: true` (settings, model picker, navigation, `/new`, `/clear`, `/fast`). [[src/renderer/src/screens/Chat/hooks/useChatActions.ts#useChatActions]] reads that flag to suppress the echoed `/command` user bubble for them — their effect is the UI change itself, so a bubble would be a dangling artifact. Output-producing desktop commands (`/help`, `/memory`, `/usage`, …) are not flagged and still echo, so their output reads as a reply.
 
+`/settings <section>` forwards the section name through `openSettings` to [[src/renderer/src/screens/Layout/Layout.tsx]], which opens Settings and scrolls to the matching `#settings-section-<name>` anchor (`appearance`, `privacy`, `hermesagent`); an unknown or omitted name just opens Settings at the top.
+
 Asynchronous Agent commands render a temporary slash-loader bubble without transcript actions such as Copy; the bubble is replaced by the command output or error when execution finishes.
 
 ### Agent commands
@@ -86,6 +88,8 @@ Model commands and Agent `send`/skill directives pass through [[src/renderer/src
 ### Command icons
 
 Visual presentation in the autocomplete popup is handled by [[src/renderer/src/screens/Chat/slash/SlashCommandIcon.tsx#SlashCommandIcon]], mapping command names to Lucide icons with fallback defaults and a custom SVG registry. Every slash command including desktop settings and navigation shortcuts is assigned an icon.
+
+Custom icons render via `dangerouslySetInnerHTML`, so string SVGs passed to [[src/renderer/src/screens/Chat/slash/SlashCommandIcon.tsx#registerCustomSlashSvg]] are stripped of `<script>`/`<foreignObject>`, inline `on*` handlers, and `javascript:` URIs before storage — a defensive guard (real icons never need them), not a full sanitizer. Only register trusted markup; route remote/plugin-sourced SVG through a proper sanitizer first.
 
 Typing `/` opens a centered command palette in [[src/renderer/src/screens/Chat/ChatInput.tsx#ChatInput]] while the composer retains keyboard focus. Results filter by name or description, stay grouped by category, and support arrows, Enter or Tab, and Escape.
 

@@ -713,7 +713,7 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
 
       <ConfigHealth />
 
-      <div className="settings-section">
+      <div className="settings-section" id="settings-section-hermesagent">
         <div className="settings-section-title">
           {t("settings.sections.hermesAgent")}
         </div>
@@ -1256,7 +1256,7 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
         </div>
       )}
 
-      <div className="settings-section">
+      <div className="settings-section" id="settings-section-appearance">
         <div className="settings-section-title">
           {t("settings.sections.appearance")}
         </div>
@@ -1350,7 +1350,7 @@ function Settings({ profile }: { profile?: string }): React.JSX.Element {
         </div>
       </div>
 
-      <div className="settings-section">
+      <div className="settings-section" id="settings-section-privacy">
         <div className="settings-section-title">
           {t("settings.sections.privacy")}
         </div>

@@ -118,11 +118,14 @@ export function deleteSessionContextFolderForSession(
 export function getRecentSessionContextFolders(limit = 20): string[] {
   const db = getDbConnection(true);
   if (!db || !tableExists(db)) return [];
+  // GROUP BY (not DISTINCT) so each folder appears once ordered by its most
+  // recent use. A `DISTINCT folder_path ... ORDER BY updated_at` collapses the
+  // duplicates but then orders by an arbitrary one of each path's rows, so a
+  // folder reused recently could sort as if it were old.
   const rows = db
     .prepare(
-      `SELECT DISTINCT folder_path FROM ${TABLE} WHERE folder_path IS NOT NULL AND folder_path != '' ORDER BY updated_at DESC LIMIT ?`,
+      `SELECT folder_path FROM ${TABLE} WHERE folder_path IS NOT NULL AND folder_path != '' GROUP BY folder_path ORDER BY MAX(updated_at) DESC LIMIT ?`,
     )
     .all(limit) as Array<{ folder_path: string }>;
   return rows.map((r) => r.folder_path);
 }
-

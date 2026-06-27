@@ -10,6 +10,7 @@ export default {
   cloneFromLabel: "שכפול מ",
   running: "פעיל",
   off: "כבוי",
+  starting: "מפעיל…",
   createFailed: "יצירת הפרופיל נכשלה",
   creating: "יוצר...",
   create: "יצירה",

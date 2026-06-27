@@ -10,6 +10,7 @@ export default {
   cloneFromLabel: "複製元",
   running: "稼働中",
   off: "停止",
+  starting: "起動中…",
   createFailed: "プロファイル作成に失敗しました",
   creating: "作成中...",
   create: "作成",

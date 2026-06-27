@@ -10,6 +10,7 @@ export default {
   cloneFromLabel: "Clone from",
   running: "Running",
   off: "Off",
+  starting: "Starting…",
   createFailed: "Failed to create profile",
   creating: "Creating...",
   create: "Create",

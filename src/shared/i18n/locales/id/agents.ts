@@ -10,6 +10,7 @@ export default {
   cloneFromLabel: "Klon dari",
   running: "Berjalan",
   off: "Mati",
+  starting: "Memulai…",
   createFailed: "Gagal membuat profil",
   creating: "Membuat...",
   create: "Buat",

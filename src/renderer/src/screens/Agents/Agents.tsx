@@ -42,6 +42,9 @@ function Agents({
   const [cloneSource, setCloneSource] = useState("default");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+  // Profile whose gateway we're waiting on after a switch — drives the
+  // "Starting…" status while it spins up.
+  const [startingProfile, setStartingProfile] = useState<string | null>(null);
 
   const loadProfiles = useCallback(async (): Promise<void> => {
     const list = await window.hermesAPI.listProfiles();
@@ -72,7 +75,12 @@ function Agents({
         setProfiles(list);
         const target = list.find((p) => p.name === name);
         attemptsLeft -= 1;
-        if (target?.gatewayRunning || attemptsLeft <= 0) return;
+        if (target?.gatewayRunning || attemptsLeft <= 0) {
+          // Either it's up, or we gave up — drop the "Starting…" state so the
+          // row settles on its real Running/Off status.
+          setStartingProfile((current) => (current === name ? null : current));
+          return;
+        }
         gatewayPollRef.current = setTimeout(tick, 700);
       };
       gatewayPollRef.current = setTimeout(tick, 700);
@@ -121,6 +129,12 @@ function Agents({
   }
 
   async function handleSelect(name: string): Promise<void> {
+    // Show "Starting…" only when this profile's gateway isn't already up, so
+    // switching to an already-running profile doesn't flash a fake spinner.
+    const alreadyRunning = profiles.find(
+      (p) => p.name === name,
+    )?.gatewayRunning;
+    setStartingProfile(alreadyRunning ? null : name);
     await window.hermesAPI.setActiveProfile(name);
     onSelectProfile(name);
     loadProfiles();
@@ -294,19 +308,26 @@ function Agents({
               )}
             </div>
             <div className="agents-cell-status">
-              <span
-                className={`agents-status-pill ${
-                  p.gatewayRunning ? "on" : "off"
-                }`}
-                title={
-                  p.gatewayRunning
-                    ? t("agents.gatewayRunning")
-                    : t("agents.gatewayOff")
-                }
-              >
-                <span className="agents-status-dot" />
-                {p.gatewayRunning ? t("agents.running") : t("agents.off")}
-              </span>
+              {startingProfile === p.name && !p.gatewayRunning ? (
+                <span className="agents-status-pill starting">
+                  <span className="agents-status-spinner" />
+                  {t("agents.starting")}
+                </span>
+              ) : (
+                <span
+                  className={`agents-status-pill ${
+                    p.gatewayRunning ? "on" : "off"
+                  }`}
+                  title={
+                    p.gatewayRunning
+                      ? t("agents.gatewayRunning")
+                      : t("agents.gatewayOff")
+                  }
+                >
+                  <span className="agents-status-dot" />
+                  {p.gatewayRunning ? t("agents.running") : t("agents.off")}
+                </span>
+              )}
             </div>
             <div className="agents-cell-actions">
               <button

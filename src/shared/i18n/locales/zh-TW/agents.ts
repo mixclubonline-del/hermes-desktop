@@ -10,6 +10,7 @@ export default {
   cloneFromLabel: "從以下檔案複製",
   running: "執行中",
   off: "已關閉",
+  starting: "啟動中…",
   createFailed: "建立 Agent 檔案失敗",
   creating: "建立中...",
   create: "建立",

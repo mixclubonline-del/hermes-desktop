@@ -9,6 +9,7 @@ export default {
   cloneFromLabel: "从以下档案复制",
   running: "运行中",
   off: "已关闭",
+  starting: "启动中…",
   createFailed: "创建档案失败",
   creating: "创建中...",
   create: "创建",

@@ -9143,6 +9143,22 @@ body {
   color: var(--text-muted);
 }
 
+/* While the gateway spins up after a switch: a small spinner + "Starting…". */
+.agents-status-pill.starting {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.agents-status-spinner {
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid color-mix(in srgb, var(--success) 35%, transparent);
+  border-top-color: var(--success);
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: spin 0.7s linear infinite;
+}
+
 .agents-status-dot {
   width: 7px;
   height: 7px;

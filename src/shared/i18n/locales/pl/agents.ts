@@ -10,6 +10,7 @@ export default {
   cloneFromLabel: "Klonuj z",
   running: "Działa",
   off: "Wył.",
+  starting: "Uruchamianie…",
   createFailed: "Nie udało się utworzyć profilu",
   creating: "Tworzenie...",
   create: "Utwórz",

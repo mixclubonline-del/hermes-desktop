@@ -10,6 +10,7 @@ export default {
   cloneFromLabel: "Şuradan kopyala",
   running: "Çalışıyor",
   off: "Kapalı",
+  starting: "Başlatılıyor…",
   createFailed: "Profil oluşturulamadı",
   creating: "Oluşturuluyor...",
   create: "Oluştur",
